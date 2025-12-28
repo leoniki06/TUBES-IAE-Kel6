@@ -51,4 +51,3 @@ type User {
   name: String!
   email: String!
   role: String!
-}
