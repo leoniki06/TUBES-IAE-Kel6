@@ -1,0 +1,54 @@
+scalar Date
+scalar DateTime
+
+type Query {
+  book(id: ID! @eq): Book @find
+
+  books(q: String, first: Int = 10, page: Int = 1): [Book!]!
+    @paginate(type: PAGINATOR, defaultCount: 10, builder: "App\\GraphQL\\Queries\\BookQuery@builder")
+
+  myTransactions(first: Int = 10, page: Int = 1): [Transaction!]!
+    @paginate(type: PAGINATOR, defaultCount: 10, builder: "App\\GraphQL\\Queries\\MyTransactionQuery@builder")
+}
+
+type Mutation {
+  borrowBook(book_id: ID!): Transaction
+    @field(resolver: "App\\GraphQL\\Mutations\\BorrowBook@resolve")
+
+  returnBook(transaction_id: ID!): Transaction
+    @field(resolver: "App\\GraphQL\\Mutations\\ReturnBook@resolve")
+}
+
+type Book {
+  id: ID!
+  isbn: String
+  title: String!
+  author: String!
+  publisher: String
+  year: Int
+  stock_total: Int!
+  stock_available: Int!
+  created_at: DateTime!
+  updated_at: DateTime!
+  transactions: [Transaction!]! @hasMany
+}
+
+type Transaction {
+  id: ID!
+  borrow_date: Date!
+  due_date: Date!
+  return_date: Date
+  status: String!
+  fine_amount: Int!
+  created_at: DateTime!
+  updated_at: DateTime!
+  user: User! @belongsTo
+  book: Book! @belongsTo
+}
+
+type User {
+  id: ID!
+  name: String!
+  email: String!
+  role: String!
+}
