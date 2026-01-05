@@ -27,15 +27,13 @@ $routes->setAutoRoute(false);
 | Public Routes
 |--------------------------------------------------------------------------
 */
-$routes->get('/', static fn() => redirect()->to('/auth/login'));
+$routes->get('/', 'Auth::splash');
 
 $routes->group('auth', static function ($routes) {
-    // pages
-    $routes->get('login',    'Auth::login');
+    $routes->get('login', 'Auth::login');
     $routes->get('register', 'Auth::register');
 
-    // actions
-    $routes->post('login',    'Auth::doLogin');
+    $routes->post('login', 'Auth::doLogin');
     $routes->post('register', 'Auth::doRegister');
 
     $routes->get('logout', 'Auth::logout');
@@ -45,30 +43,41 @@ $routes->get('debug', 'Debug::index');
 
 /*
 |--------------------------------------------------------------------------
-| Librarian Only (Login + Role librarian)
+| Alias (biar /transactions tetap jalan)
+|--------------------------------------------------------------------------
+| Jadi kalau ada link lama /transactions, diarahkan ke /librarian/transactions
+*/
+$routes->get('transactions', static fn() => redirect()->to('/librarian/transactions'));
+$routes->get('transactions/(:segment)', static fn($any) => redirect()->to('/librarian/transactions/' . $any));
+
+/*
+|--------------------------------------------------------------------------
+| Librarian Routes
 |--------------------------------------------------------------------------
 */
 $routes->group('librarian', static function ($routes) {
 
-    // dashboard
+    // Dashboard
     $routes->get('dashboard', 'Librarian\Dashboard::index');
 
-    // Books (pakai view: librarian/Books/*)
+    // Books
     $routes->get('books', 'Librarian\Books::index');
-    $routes->get('books/create', 'Librarian\Books::create');
     $routes->post('books', 'Librarian\Books::store');
-    $routes->get('books/(:num)', 'Librarian\Books::show/$1');
-    $routes->get('books/(:num)/edit', 'Librarian\Books::edit/$1');
-    $routes->post('books/(:num)', 'Librarian\Books::update/$1');
-    $routes->post('books/(:num)/delete', 'Librarian\Books::destroy/$1');
+    $routes->post('books/(:num)/update', 'Librarian\Books::update/$1');
+    $routes->post('books/(:num)/delete', 'Librarian\Books::delete/$1');
 
-    // ✅ Members (librarian) -> jadi /librarian/members
-    $routes->get('members', 'Members::index');
-    $routes->get('members/create', 'Members::create');
-    $routes->get('members/(:num)', 'Members::show/$1');
-    $routes->get('members/(:num)/edit', 'Members::edit/$1');
+    // Members
+    $routes->get('members', 'Librarian\Members::index');
+    $routes->get('members/new', 'Librarian\Members::new');
+    $routes->post('members', 'Librarian\Members::create');
+    $routes->get('members/(:num)', 'Librarian\Members::show/$1');
+    $routes->get('members/(:num)/edit', 'Librarian\Members::edit/$1');
+    $routes->post('members/(:num)/update', 'Librarian\Members::update/$1');
+    $routes->post('members/(:num)/delete', 'Librarian\Members::delete/$1');
 
-    // ✅ Transactions (librarian) -> jadi /librarian/transactions
-    $routes->get('transactions', 'Librarian\Transactions::index');
-    $routes->get('transactions/(:num)', 'Librarian\Transactions::show/$1');
+    // Transactions
+    $routes->group('transactions', static function ($routes) {
+        $routes->get('/', 'Librarian\Transactions::index');
+        $routes->post('(:num)/return', 'Librarian\Transactions::markReturned/$1');
+    });
 });

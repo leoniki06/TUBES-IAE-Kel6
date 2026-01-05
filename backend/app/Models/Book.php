@@ -2,18 +2,27 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Book extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
-        'isbn', 'title', 'author', 'publisher', 'year',
-        'stock_total', 'stock_available',
+        'isbn',
+        'title',
+        'author',
+        'publisher',
+        'genre',          // ✅ PENTING
+        'year',
+        'stock_total',
+        'stock_available',
     ];
 
-    public function transactions(): HasMany
-    {
-        return $this->hasMany(Transaction::class);
-    }
+    protected $casts = [
+        'year'            => 'integer',
+        'stock_total'     => 'integer',
+        'stock_available' => 'integer',
+    ];
 }

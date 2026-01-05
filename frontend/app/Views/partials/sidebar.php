@@ -1,69 +1,80 @@
 <?php
-$path = service('uri')->getPath();
+$uri  = service('uri');
+$path = trim($uri->getPath(), '/');
 
-$is = function (string $needle) use ($path) {
-    return str_contains($path, $needle);
+$uDash    = site_url('librarian/dashboard');
+$uBooks   = site_url('librarian/books');
+$uMembers = site_url('librarian/members');
+$uTx      = site_url('librarian/transactions');
+$uOverdue = $uTx . '?' . http_build_query(['status' => 'overdue']);
+
+$isActive = function (string $route) use ($path): bool {
+    $route = trim($route, '/');
+    return ($path === $route) || str_starts_with($path, $route . '/');
 };
 
-$activeDashboard = $is('librarian/dashboard') || $path === 'dashboard' || $path === '';
-$activeBooks     = $is('librarian/books') || $is('books');
-$activeMembers   = $is('members');
-$activeTx        = $is('librarian/transactions') || $is('transactions');
-
-$role = 'Librarian';
+$logoSrc = base_url('assets/img/logo-white.png');
 ?>
 
-<aside class="sb2">
-    <div class="sb2-top">
-        <div class="sb2-brand">
-            <div class="sb2-logo" aria-hidden="true"></div>
-            <div>
-                <div class="sb2-name">BookHouse</div>
-                <div class="sb2-role"><?= esc($role) ?> Panel</div>
+<aside class="sb3">
+    <div class="sb3-top">
+        <a class="sb3-logoWrap" href="<?= $uDash ?>" aria-label="BookHouse">
+            <img class="sb3-logoImg" src="<?= $logoSrc ?>" alt="BookHouse"
+                onerror="this.style.display='none'; this.parentElement.classList.add('is-fallback');" />
+            <div class="sb3-logoFallback">
+                <i class="fa-solid fa-book-open"></i>
             </div>
+        </a>
+
+        <div class="sb3-section">
+            <i class="fa-solid fa-layer-group"></i>&nbsp; MAIN
         </div>
 
-        <div class="sb2-section">MAIN</div>
-
-        <nav class="sb2-nav">
-            <a class="sb2-item <?= $activeDashboard ? 'is-active' : '' ?>" href="<?= base_url('librarian/dashboard') ?>">
-                <span class="sb2-ic" aria-hidden="true">⌂</span>
-                <span class="sb2-label">Dashboard</span>
-                <?php if ($activeDashboard): ?><span class="sb2-badge">Live</span><?php endif; ?>
+        <nav class="sb3-nav">
+            <a class="sb3-item <?= $isActive('librarian/dashboard') ? 'is-active' : '' ?>" href="<?= $uDash ?>">
+                <span class="sb3-ic"><i class="fa-solid fa-house"></i></span>
+                <span class="sb3-label">Dashboard</span>
+                <span class="sb3-live">Live</span>
             </a>
 
-            <a class="sb2-item <?= $activeBooks ? 'is-active' : '' ?>" href="<?= base_url('librarian/books') ?>">
-                <span class="sb2-ic" aria-hidden="true">📚</span>
-                <span class="sb2-label">Books</span>
+            <a class="sb3-item <?= $isActive('librarian/books') ? 'is-active' : '' ?>" href="<?= $uBooks ?>">
+                <span class="sb3-ic"><i class="fa-solid fa-book"></i></span>
+                <span class="sb3-label">Books</span>
             </a>
 
-            <a class="sb2-item <?= $activeMembers ? 'is-active' : '' ?>" href="<?= base_url('members') ?>">
-                <span class="sb2-ic" aria-hidden="true">👤</span>
-                <span class="sb2-label">Members</span>
+            <a class="sb3-item <?= $isActive('librarian/members') ? 'is-active' : '' ?>" href="<?= $uMembers ?>">
+                <span class="sb3-ic"><i class="fa-solid fa-users"></i></span>
+                <span class="sb3-label">Members</span>
             </a>
 
-            <a class="sb2-item <?= $activeTx ? 'is-active' : '' ?>" href="<?= base_url('librarian/transactions') ?>">
-                <span class="sb2-ic" aria-hidden="true">⇄</span>
-                <span class="sb2-label">Transactions</span>
+            <a class="sb3-item <?= $isActive('librarian/transactions') ? 'is-active' : '' ?>" href="<?= $uTx ?>">
+                <span class="sb3-ic"><i class="fa-solid fa-right-left"></i></span>
+                <span class="sb3-label">Transactions</span>
             </a>
         </nav>
     </div>
 
-    <div class="sb2-bottom">
-        <div class="sb2-focus">
-            <div class="sb2-focus-title">Today Focus</div>
-            <div class="sb2-focus-text">Prioritaskan <b>overdue</b> agar denda tercatat rapi.</div>
-            <div class="sb2-focus-actions">
-                <a class="sb2-pillbtn" href="<?= base_url('librarian/transactions') ?>?status=overdue">View Overdue</a>
-                <a class="sb2-pillbtn ghost" href="<?= base_url('librarian/books') ?>?sort=new">New Books</a>
+    <div class="sb3-bottom">
+        <div class="sb3-focus">
+            <div class="sb3-focus-head">
+                <div>
+                    <div class="sb3-focus-title">Today Focus</div>
+                    <div class="sb3-focus-sub">Rapikan overdue biar denda terdata.</div>
+                </div>
+                <span class="sb3-focus-dot" aria-hidden="true"></span>
+            </div>
+
+            <div class="sb3-focus-actions">
+                <a class="sb3-pill" href="<?= $uOverdue ?>">View Overdue</a>
+                <a class="sb3-pill ghost" href="<?= $uBooks ?>">New Books</a>
             </div>
         </div>
 
-        <a class="sb2-logout" href="<?= base_url('auth/logout') ?>">
-            <span class="sb2-ic" aria-hidden="true">⟲</span>
-            <span class="sb2-label">Logout</span>
+        <a class="sb3-logout" href="<?= site_url('auth/logout') ?>">
+            <span class="sb3-ic"><i class="fa-solid fa-right-from-bracket"></i></span>
+            Logout
         </a>
 
-        <div class="sb2-footnote">BookHouse • v1</div>
+        <div class="sb3-footnote">BookHouse • v1</div>
     </div>
 </aside>

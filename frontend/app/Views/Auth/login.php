@@ -156,11 +156,11 @@
                 <?= csrf_field() ?>
 
                 <label>Email</label>
-                <input type="email" name="email" value="<?= esc(old('email')) ?>" placeholder="nama@email.com">
+                <input type="email" name="email" value="<?= esc(old('email') ?? ($defaultEmail ?? '')) ?>" />
                 <?php if (!empty($errors['email'])): ?><div class="err"><?= esc($errors['email']) ?></div><?php endif; ?>
 
                 <label>Password</label>
-                <input type="password" name="password" placeholder="••••••••">
+                <input type="password" name="password" value="<?= esc($defaultPass ?? '') ?>" />
                 <?php if (!empty($errors['password'])): ?><div class="err"><?= esc($errors['password']) ?></div><?php endif; ?>
 
                 <button class="btn" type="submit">Masuk</button>

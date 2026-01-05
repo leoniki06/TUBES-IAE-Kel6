@@ -2,139 +2,100 @@
 <?= $this->section('content') ?>
 
 <?php
-// ===== Data dari controller (amanin default) =====
-$books  = $books ?? [];
-$meta   = $meta ?? ['current_page' => 1, 'last_page' => 1, 'total' => count($books)];
-$search = $search ?? (string) (service('request')->getGet('search') ?? '');
+$errors = session()->getFlashdata('errors') ?? [];
 
-$current = (int)($meta['current_page'] ?? 1);
-$last    = (int)($meta['last_page'] ?? 1);
-$total   = (int)($meta['total'] ?? count($books));
+// pagination meta
+$current = (int) ($meta['current_page'] ?? 1);
+$last    = (int) ($meta['last_page'] ?? 1);
 
-// ===== Query params (konsep "toolbar seperti referensi") =====
-$req = service('request');
+// query string
+$searchVal = (string) ($search ?? '');
+$qs = $searchVal !== '' ? '&search=' . urlencode($searchVal) : '';
 
-$perPage  = (int)($req->getGet('perPage') ?? 10);
-$perPage  = in_array($perPage, [10, 20, 50], true) ? $perPage : 10;
+// flash
+$flashSuccess = session()->getFlashdata('success');
+$flashError   = session()->getFlashdata('error');
 
-$category = (string)($req->getGet('category') ?? 'all');
-$sort     = (string)($req->getGet('sort') ?? 'new'); // optional (new/old/stock)
+// items
+$totalItems = (int)($totalItems ?? ($meta['total'] ?? count($books ?? [])));
 
-// helper: build query string preserve state
-$qsBuild = function (array $extra = []) use ($search, $perPage, $category, $sort, $current) {
-    $q = [
-        'search'   => $search ?: null,
-        'perPage'  => $perPage ?: null,
-        'category' => ($category && $category !== 'all') ? $category : null,
-        'sort'     => $sort ?: null,
-        'page'     => $current ?: 1,
-    ];
-    foreach ($extra as $k => $v) $q[$k] = $v;
-
-    // bersihin null
-    $q = array_filter($q, fn($v) => $v !== null && $v !== '');
-    return $q ? ('?' . http_build_query($q)) : '';
-};
-
-// helper avatar initial
-$initial = function ($title) {
-    $t = trim((string)$title);
-    if ($t === '') return 'B';
-    return strtoupper(mb_substr($t, 0, 1));
-};
-
-// (opsional) daftar kategori untuk filter UI.
-// kalau controller sudah kirim $categories, pakai itu.
-// kalau belum, fallback ambil dari data $books.
-$categories = $categories ?? [];
-if (empty($categories)) {
-    $tmp = [];
-    foreach ($books as $b) {
-        $c = (string)($b['category'] ?? '');
-        if ($c !== '') $tmp[$c] = true;
-    }
-    $categories = array_keys($tmp);
-    sort($categories);
-}
+// genres list
+$genres = [
+    'Fiksi',
+    'Non-Fiksi',
+    'Novel',
+    'Sastra',
+    'Pendidikan',
+    'Ilmu Pengetahuan',
+    'Teknologi & Komputer',
+    'Sejarah',
+    'Biografi',
+    'Agama',
+    'Ekonomi & Bisnis',
+    'Psikologi',
+    'Kesehatan',
+    'Hukum & Politik',
+    'Anak & Remaja',
+];
 ?>
 
 <div class="bx-page">
 
-    <!-- Title bar (mirip referensi: judul kiri, tombol utama kanan) -->
     <div class="bx-titlebar">
         <div>
             <h1 class="bx-title">Books</h1>
-            <p class="bx-sub">Kelola katalog buku: tambah, edit, hapus, dan lihat detail.</p>
+            <p class="bx-sub">Kelola katalog buku: tambah, edit, hapus, dan lihat info.</p>
         </div>
 
-        <a class="btn btn-secondary" href="<?= base_url('librarian/books/create') ?>">
-            + Add New Book
-        </a>
+        <button class="bx-btn primary" type="button" data-open="modal-add">
+            <span class="bx-plus">+</span> Add New Book
+        </button>
     </div>
 
-    <?php if (session()->getFlashdata('success')): ?>
-        <div class="alert success"><?= esc(session()->getFlashdata('success')) ?></div>
-    <?php endif; ?>
-    <?php if (session()->getFlashdata('error')): ?>
-        <div class="alert error"><?= esc(session()->getFlashdata('error')) ?></div>
-    <?php endif; ?>
+    <!-- Toasts (fixed top-right via CSS patch) -->
+    <div class="bx-toasts" aria-live="polite" aria-atomic="true">
+        <?php if ($flashSuccess): ?>
+            <div class="bx-toast success js-toast" role="status" data-autohide="3500">
+                <div class="bx-toast-title">Success</div>
+                <div class="bx-toast-msg"><?= esc($flashSuccess) ?></div>
+                <button type="button" class="bx-toast-close" data-toast-close aria-label="Close">✕</button>
+            </div>
+        <?php endif; ?>
 
-    <!-- Surface Card -->
-    <div class="card bx-card">
+        <?php if ($flashError): ?>
+            <div class="bx-toast error js-toast" role="alert" data-autohide="4500">
+                <div class="bx-toast-title">Error</div>
+                <div class="bx-toast-msg"><?= esc($flashError) ?></div>
+                <button type="button" class="bx-toast-close" data-toast-close aria-label="Close">✕</button>
+            </div>
+        <?php endif; ?>
+    </div>
 
-        <!-- Toolbar: Search + Showing + Filter + Export + Total -->
+    <div class="bx-card">
+        <!-- Toolbar -->
         <div class="bx-toolbar">
-
-            <form class="bx-left" method="get" action="<?= base_url('librarian/books') ?>" style="gap:12px;">
-                <!-- Search -->
-                <div class="bx-search" role="search" style="min-width:min(520px, 92vw);">
-                    <span class="bx-ic">⌕</span>
+            <div class="bx-left">
+                <form id="booksSearchForm" class="bx-search" method="get" action="<?= base_url('librarian/books') ?>">
+                    <span class="bx-ic" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none">
+                            <path d="M10.5 19a8.5 8.5 0 1 1 0-17 8.5 8.5 0 0 1 0 17Z" stroke="currentColor" stroke-width="2" />
+                            <path d="M16.8 16.8 21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                    </span>
                     <input
-                        type="text"
+                        id="booksSearchInput"
                         name="search"
-                        placeholder="Search title / author..."
-                        value="<?= esc($search) ?>"
-                        autocomplete="off">
-                </div>
+                        placeholder="Search title / author / isbn / publisher / genre..."
+                        value="<?= esc($searchVal) ?>">
+                </form>
 
-                <!-- Showing / perPage (ref: dropdown kecil) -->
-                <label class="inline" style="display:flex; align-items:center; gap:10px;">
-                    <span style="font-size:12px; font-weight:900; color:var(--muted);">Showing</span>
-                    <select class="bx-select" name="perPage" onchange="this.form.submit()">
-                        <option value="10" <?= $perPage === 10 ? 'selected' : '' ?>>10</option>
-                        <option value="20" <?= $perPage === 20 ? 'selected' : '' ?>>20</option>
-                        <option value="50" <?= $perPage === 50 ? 'selected' : '' ?>>50</option>
-                    </select>
-                </label>
-
-                <!-- Filter category (ref: tombol filter) -->
-                <select class="bx-select" name="category" onchange="this.form.submit()" title="Filter category">
-                    <option value="all" <?= $category === 'all' ? 'selected' : '' ?>>All Categories</option>
-                    <?php foreach ($categories as $c): ?>
-                        <option value="<?= esc($c) ?>" <?= $category === $c ? 'selected' : '' ?>><?= esc($c) ?></option>
-                    <?php endforeach; ?>
-                </select>
-
-                <!-- Sort (optional, tetep clean) -->
-                <select class="bx-select" name="sort" onchange="this.form.submit()" title="Sort">
-                    <option value="new" <?= $sort === 'new' ? 'selected' : '' ?>>Newest</option>
-                    <option value="old" <?= $sort === 'old' ? 'selected' : '' ?>>Oldest</option>
-                    <option value="stock" <?= $sort === 'stock' ? 'selected' : '' ?>>Lowest Stock</option>
-                </select>
-
-                <!-- Action buttons -->
-                <button class="btn btn-ghost" type="submit">Search</button>
-
-                <?php if ($search || $category !== 'all' || $perPage !== 10 || $sort !== 'new'): ?>
-                    <a class="btn btn-ghost" href="<?= base_url('librarian/books') ?>">Reset</a>
+                <?php if ($searchVal !== ''): ?>
+                    <a class="bx-btn" href="<?= base_url('librarian/books') ?>">Reset</a>
                 <?php endif; ?>
-
-                <!-- Export (dummy link dulu) -->
-                <a class="btn btn-ghost" href="#" onclick="return false;" title="Export (soon)">Export</a>
-            </form>
+            </div>
 
             <div class="bx-right">
-                <div class="bx-pill">Total: <?= esc($total) ?></div>
+                <div class="bx-pill"><?= $totalItems ?> items</div>
             </div>
         </div>
 
@@ -143,91 +104,98 @@ if (empty($categories)) {
             <table class="bx-table">
                 <thead>
                     <tr>
-                        <th style="width:90px;">ID</th>
+                        <th style="width:160px;">Genre</th>
                         <th>Book</th>
-                        <th style="width:220px;">Author</th>
-                        <th style="width:170px;">Category</th>
-                        <th style="width:120px;">Stock</th>
-                        <th style="width:90px; text-align:right;">Action</th>
+                        <th style="width:160px;">Author</th>
+                        <th style="width:170px;">Publisher</th>
+                        <th style="width:110px;">Year</th>
+                        <th style="width:140px;">Stock</th>
+                        <th style="width:120px; text-align:right;">Action</th>
                     </tr>
                 </thead>
 
                 <tbody>
                     <?php if (empty($books)): ?>
                         <tr>
-                            <td colspan="6">
+                            <td colspan="7" style="padding:0; border:none; background:transparent; box-shadow:none;">
                                 <div class="bx-empty">
                                     <div class="t">Tidak ada data</div>
-                                    <div class="d">Coba tambah buku baru atau ubah keyword pencarian.</div>
+                                    <div class="d">Coba cari kata lain atau tambah buku baru.</div>
                                 </div>
                             </td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($books as $b): ?>
                             <?php
-                            $id = (int)($b['id'] ?? 0);
-                            $title = (string)($b['title'] ?? '-');
-                            $author = (string)($b['author'] ?? '-');
-                            $cat = (string)($b['category'] ?? '-');
-                            $stock = (int)($b['stock'] ?? 0);
+                            $id        = (int)($b['id'] ?? 0);
+                            $title     = (string)($b['title'] ?? '-');
+                            $author    = (string)($b['author'] ?? '-');
+                            $publisher = (string)($b['publisher'] ?? '-');
+                            $genre     = (string)($b['genre'] ?? '-');
+                            $year      = (int)($b['year'] ?? 0);
+                            $isbn      = (string)($b['isbn'] ?? '');
 
-                            $low = $stock <= 2;
-                            $rowKey = 'row-' . $id;
+                            $total     = (int)($b['stock_total'] ?? 0);
+                            $avail     = (int)($b['stock_available'] ?? 0);
+
+                            // low stock: <=20% atau avail=0
+                            $isLow = $avail <= 0 || ($total > 0 && ($avail / max(1, $total)) <= 0.2);
+
+                            $firstChar = '-';
+                            $tTrim = trim($title);
+                            if ($tTrim !== '' && $tTrim !== '-') {
+                                $firstChar = strtoupper(mb_substr($tTrim, 0, 1));
+                            }
                             ?>
                             <tr>
-                                <td class="bx-id">#<?= esc($id) ?></td>
+                                <td><span class="bx-genre"><?= esc($genre ?: '-') ?></span></td>
 
                                 <td>
                                     <div class="bx-bookcell">
-                                        <div class="bx-avatar" aria-hidden="true"><?= esc($initial($title)) ?></div>
+                                        <div class="bx-avatar"><?= esc($firstChar) ?></div>
                                         <div style="min-width:0;">
-                                            <div class="bx-booktitle" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                                <?= esc($title) ?>
-                                            </div>
-                                            <div class="bx-booksub">
-                                                ID: <span class="bx-id">#<?= esc($id) ?></span>
-                                            </div>
+                                            <div class="bx-booktitle"><?= esc($title) ?></div>
+                                            <div class="bx-booksub"><span class="bx-strong">ISBN:</span> <?= esc($isbn ?: '-') ?></div>
                                         </div>
                                     </div>
                                 </td>
 
-                                <td>
-                                    <div style="font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                        <?= esc($author) ?>
-                                    </div>
-                                    <div class="bx-booksub">Author</div>
-                                </td>
+                                <td><?= esc($author) ?></td>
+                                <td><?= esc($publisher ?: '-') ?></td>
+                                <td><?= esc($year ?: '-') ?></td>
 
                                 <td>
-                                    <span class="bx-tag"><?= esc($cat) ?></span>
-                                </td>
-
-                                <td>
-                                    <span class="bx-stock <?= $low ? 'low' : '' ?>"><?= esc($stock) ?></span>
+                                    <span class="bx-stock <?= $isLow ? 'low' : '' ?>">
+                                        <?= esc($avail) ?>/<?= esc($total) ?>
+                                    </span>
                                 </td>
 
                                 <td style="text-align:right;">
                                     <div class="bx-actions">
                                         <button
-                                            class="bx-dotbtn"
                                             type="button"
-                                            data-bx-toggle="<?= esc($rowKey) ?>"
-                                            aria-label="Open menu">
+                                            class="bx-dotbtn"
+                                            data-open="modal-edit"
+                                            data-id="<?= esc($id) ?>"
+                                            data-isbn="<?= esc($isbn) ?>"
+                                            data-title="<?= esc($title) ?>"
+                                            data-author="<?= esc($author) ?>"
+                                            data-publisher="<?= esc($publisher) ?>"
+                                            data-genre="<?= esc($genre) ?>"
+                                            data-year="<?= esc($year) ?>"
+                                            data-stock_total="<?= esc($total) ?>"
+                                            data-stock_available="<?= esc($avail) ?>"
+                                            title="Edit">
                                             <span class="dots">⋯</span>
                                         </button>
 
-                                        <div class="bx-menu" data-bx-menu="<?= esc($rowKey) ?>">
-                                            <a href="<?= base_url('librarian/books/' . $id) ?>">👁 Detail</a>
-                                            <a href="<?= base_url('librarian/books/' . $id . '/edit') ?>">✏ Edit</a>
-
-                                            <form
-                                                method="post"
-                                                action="<?= base_url('librarian/books/' . $id . '/delete') ?>"
-                                                onsubmit="return confirm('Yakin hapus buku ini?');">
-                                                <?= csrf_field() ?>
-                                                <button class="danger" type="submit">🗑 Delete</button>
-                                            </form>
-                                        </div>
+                                        <form method="post"
+                                            action="<?= base_url('librarian/books/' . $id . '/delete') ?>"
+                                            onsubmit="return confirm('Yakin hapus buku ini?');"
+                                            style="display:inline;">
+                                            <?= csrf_field() ?>
+                                            <button type="submit" class="bx-dotbtn" style="color:var(--c-danger);" title="Delete">🗑</button>
+                                        </form>
                                     </div>
                                 </td>
                             </tr>
@@ -237,66 +205,192 @@ if (empty($categories)) {
             </table>
         </div>
 
-        <!-- Pagination (ref: kiri Previous, tengah nomor, kanan Next) -->
-        <div class="bx-paging">
-            <a
-                class="bx-pagebtn <?= $current <= 1 ? 'disabled' : '' ?>"
-                href="<?= $current <= 1 ? '#' : base_url('librarian/books' . $qsBuild(['page' => $current - 1])) ?>">
-                Previous
-            </a>
+        <!-- Pagination -->
+        <?php if ($last > 1): ?>
+            <?php
+            $start = max(1, $current - 2);
+            $end   = min($last, $current + 2);
+            ?>
+            <div class="bx-paging">
+                <a class="bx-pagebtn <?= $current <= 1 ? 'disabled' : '' ?>"
+                    href="<?= $current <= 1 ? '#' : base_url('librarian/books?page=' . ($current - 1) . $qs) ?>">
+                    Previous
+                </a>
 
-            <div class="bx-pages">
-                <?php for ($p = max(1, $current - 2); $p <= min($last, $current + 2); $p++): ?>
-                    <a
-                        class="bx-p <?= $p === $current ? 'active' : '' ?>"
-                        href="<?= base_url('librarian/books' . $qsBuild(['page' => $p])) ?>">
-                        <?= $p ?>
-                    </a>
-                <?php endfor; ?>
+                <div class="bx-pages">
+                    <?php for ($p = $start; $p <= $end; $p++): ?>
+                        <a class="bx-p <?= $p === $current ? 'active' : '' ?>"
+                            href="<?= base_url('librarian/books?page=' . $p . $qs) ?>">
+                            <?= $p ?>
+                        </a>
+                    <?php endfor; ?>
+                </div>
+
+                <a class="bx-pagebtn <?= $current >= $last ? 'disabled' : '' ?>"
+                    href="<?= $current >= $last ? '#' : base_url('librarian/books?page=' . ($current + 1) . $qs) ?>">
+                    Next
+                </a>
             </div>
-
-            <a
-                class="bx-pagebtn <?= $current >= $last ? 'disabled' : '' ?>"
-                href="<?= $current >= $last ? '#' : base_url('librarian/books' . $qsBuild(['page' => $current + 1])) ?>">
-                Next
-            </a>
-        </div>
-
+        <?php endif; ?>
     </div>
 </div>
 
-<!-- Dropdown menu logic (klik “⋯” seperti referensi) -->
+<!-- Modal Add -->
+<div class="m-overlay" id="modal-add">
+    <div class="m" role="dialog" aria-modal="true">
+        <div class="m-head">
+            <div class="m-title">Add New Book</div>
+            <button class="m-close" type="button" data-close>✕</button>
+        </div>
+
+        <form method="post" id="addForm" action="<?= base_url('librarian/books') ?>">
+            <?= csrf_field() ?>
+
+            <div class="m-body">
+                <?php if (!empty($errors)): ?>
+                    <ul class="errlist">
+                        <?php foreach ($errors as $e): ?>
+                            <li><?= esc($e) ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+
+                <div class="m-grid">
+                    <div class="frow">
+                        <label>ISBN</label>
+                        <input name="isbn" value="<?= esc(old('isbn')) ?>" placeholder="ex: 978602032...">
+                    </div>
+
+                    <div class="frow">
+                        <label>Year</label>
+                        <input name="year" value="<?= esc(old('year')) ?>" placeholder="ex: 2021">
+                    </div>
+
+                    <div class="frow" style="grid-column:1/-1;">
+                        <label>Title</label>
+                        <input name="title" value="<?= esc(old('title')) ?>" placeholder="Judul buku">
+                    </div>
+
+                    <div class="frow">
+                        <label>Author</label>
+                        <input name="author" value="<?= esc(old('author')) ?>" placeholder="Nama penulis">
+                    </div>
+
+                    <div class="frow">
+                        <label>Publisher (optional)</label>
+                        <input name="publisher" value="<?= esc(old('publisher')) ?>" placeholder="Penerbit">
+                    </div>
+
+                    <div class="frow">
+                        <label>Genre</label>
+                        <select name="genre" required>
+                            <option value="">-- Pilih Genre --</option>
+                            <?php foreach ($genres as $g): ?>
+                                <option value="<?= esc($g) ?>" <?= old('genre') === $g ? 'selected' : '' ?>>
+                                    <?= esc($g) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="frow">
+                        <label>Stock Total</label>
+                        <input type="number" min="0" name="stock_total" value="<?= esc(old('stock_total') ?? '0') ?>">
+                        <div class="fhelp err" data-err="add_stock"></div>
+                    </div>
+
+                    <div class="frow">
+                        <label>Stock Available</label>
+                        <input type="number" min="0" name="stock_available" value="<?= esc(old('stock_available') ?? '0') ?>">
+                    </div>
+                </div>
+            </div>
+
+            <div class="m-foot">
+                <button type="button" class="bx-btn" data-close>Cancel</button>
+                <button type="submit" class="bx-btn primary js-submit">Save Book</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Edit -->
+<div class="m-overlay" id="modal-edit">
+    <div class="m" role="dialog" aria-modal="true">
+        <div class="m-head">
+            <div class="m-title">Edit Book</div>
+            <button class="m-close" type="button" data-close>✕</button>
+        </div>
+
+        <form method="post" id="editForm" action="#">
+            <?= csrf_field() ?>
+
+            <div class="m-body">
+                <div class="m-grid">
+                    <div class="frow">
+                        <label>ISBN</label>
+                        <input name="isbn" id="e_isbn">
+                    </div>
+
+                    <div class="frow">
+                        <label>Year</label>
+                        <input name="year" id="e_year">
+                    </div>
+
+                    <div class="frow" style="grid-column:1/-1;">
+                        <label>Title</label>
+                        <input name="title" id="e_title">
+                    </div>
+
+                    <div class="frow">
+                        <label>Author</label>
+                        <input name="author" id="e_author">
+                    </div>
+
+                    <div class="frow">
+                        <label>Publisher (optional)</label>
+                        <input name="publisher" id="e_publisher">
+                    </div>
+
+                    <div class="frow">
+                        <label>Genre</label>
+                        <select name="genre" id="e_genre" required>
+                            <option value="">-- Pilih Genre --</option>
+                            <?php foreach ($genres as $g): ?>
+                                <option value="<?= esc($g) ?>"><?= esc($g) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="frow">
+                        <label>Stock Total</label>
+                        <input type="number" min="0" name="stock_total" id="e_stock_total">
+                        <div class="fhelp err" data-err="edit_stock"></div>
+                    </div>
+
+                    <div class="frow">
+                        <label>Stock Available</label>
+                        <input type="number" min="0" name="stock_available" id="e_stock_available">
+                    </div>
+                </div>
+            </div>
+
+            <div class="m-foot">
+                <button type="button" class="bx-btn" data-close>Cancel</button>
+                <button type="submit" class="bx-btn primary js-submit">Update</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
-    (function() {
-        const closeAll = () => {
-            document.querySelectorAll('.bx-menu.open').forEach(m => m.classList.remove('open'));
-        };
-
-        document.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-bx-toggle]');
-            const insideMenu = e.target.closest('[data-bx-menu]');
-
-            if (btn) {
-                const key = btn.getAttribute('data-bx-toggle');
-                const menu = document.querySelector('[data-bx-menu="' + key + '"]');
-                if (!menu) return;
-
-                const isOpen = menu.classList.contains('open');
-                closeAll();
-                if (!isOpen) menu.classList.add('open');
-                e.preventDefault();
-                return;
-            }
-
-            // klik di luar menu => tutup
-            if (!insideMenu) closeAll();
-        });
-
-        // ESC to close
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeAll();
-        });
-    })();
+    window.BOOKS_PAGE = {
+        baseBooksUrl: "<?= base_url('librarian/books') ?>",
+        openAddOnError: <?= (!empty($errors) && old('title') !== null) ? 'true' : 'false' ?>
+    };
 </script>
+
+<script src="<?= base_url('assets/js/books.js') ?>" defer></script>
+<script src="<?= base_url('assets/js/books-form.js') ?>" defer></script>
 
 <?= $this->endSection() ?>

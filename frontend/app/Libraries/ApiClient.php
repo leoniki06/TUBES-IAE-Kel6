@@ -10,54 +10,45 @@ class ApiClient
 
     public function __construct()
     {
-        $this->baseUrl = rtrim((string) env('BACKEND_API_BASEURL'), '/');
+        $env = (string) env('BACKEND_API_BASEURL');
+        $this->baseUrl = rtrim($env, '/');
+
+        // ✅ kamu bilang laravel jalan di 9000
         if ($this->baseUrl === '') {
-            $this->baseUrl = 'http://127.0.0.1:8000';
+            $this->baseUrl = 'http://127.0.0.1:9000';
         }
     }
-
-    public function getBaseUrl(): string
-    {
-        return $this->baseUrl;
-    }
-
-    /* ===============================
-     * HTTP WRAPPERS (PUBLIC)
-     * =============================== */
 
     public function get(string $path, array $options = []): array
     {
         return $this->request('GET', $path, $options);
     }
-
     public function post(string $path, array $options = []): array
     {
         return $this->request('POST', $path, $options);
     }
-
     public function put(string $path, array $options = []): array
     {
         return $this->request('PUT', $path, $options);
     }
-
     public function delete(string $path, array $options = []): array
     {
         return $this->request('DELETE', $path, $options);
     }
 
-    /* ===============================
-     * CORE REQUEST HANDLER
-     * =============================== */
+    private function fullUrl(string $path): string
+    {
+        return rtrim($this->baseUrl, '/') . '/' . ltrim($path, '/');
+    }
 
     private function request(string $method, string $path, array $options = []): array
     {
-        $path = '/' . ltrim($path, '/');
-        $url  = $this->baseUrl . $path;
+        $url = $this->fullUrl($path);
 
         $client = Services::curlrequest([
-            'baseURI'     => $this->baseUrl . '/',
             'timeout'     => 20,
             'http_errors' => false,
+            'verify'      => false,
         ]);
 
         $headers = [
@@ -66,50 +57,40 @@ class ApiClient
             'User-Agent'   => 'CI4-Frontend',
         ];
 
-        // 🔐 Bearer token (kalau login)
-        if ($token = session('token')) {
+        $token = session()->get('token');
+        if (!empty($token)) {
             $headers['Authorization'] = 'Bearer ' . $token;
         }
 
-        $payload = [
-            'headers' => $headers,
-        ];
-
-        // query params (?page=1&search=...)
-        if (!empty($options['query'])) {
-            $payload['query'] = $options['query'];
+        if (!empty($options['headers']) && is_array($options['headers'])) {
+            $headers = array_merge($headers, $options['headers']);
         }
 
-        // json body (POST / PUT)
-        if (!empty($options['json'])) {
-            $payload['json'] = $options['json'];
-        }
+        $options['headers'] = $headers;
 
         try {
-            $res    = $client->request($method, ltrim($path, '/'), $payload);
-            $status = $res->getStatusCode();
-            $raw    = (string) $res->getBody();
-            $data   = json_decode($raw, true);
+            $resp = $client->request($method, $url, $options);
+            $status = (int) $resp->getStatusCode();
+            $body   = (string) $resp->getBody();
 
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                $data = ['message' => $raw];
+            $data = null;
+            if ($body !== '') {
+                $decoded = json_decode($body, true);
+                $data = is_array($decoded) ? $decoded : ['raw' => $body];
             }
 
             return [
                 'ok'     => $status >= 200 && $status < 300,
                 'status' => $status,
-                'url'    => $url,
                 'data'   => $data,
+                'error'  => null,
             ];
         } catch (\Throwable $e) {
             return [
                 'ok'     => false,
                 'status' => 0,
-                'url'    => $url,
-                'data'   => [
-                    'message' => 'Gagal konek backend API',
-                    'error'   => $e->getMessage(),
-                ],
+                'data'   => null,
+                'error'  => $e->getMessage(),
             ];
         }
     }

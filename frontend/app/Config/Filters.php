@@ -41,6 +41,9 @@ class Filters extends BaseFilters
         // add these
         'authGuard' => \App\Filters\AuthGuard::class,
         'role'      => \App\Filters\RoleGuard::class,
+
+        'auth'   => \App\Filters\AuthFilter::class,
+        'admin'  => \App\Filters\AdminFilter::class,
     ];
 
     /**

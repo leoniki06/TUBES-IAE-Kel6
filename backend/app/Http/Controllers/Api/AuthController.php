@@ -6,18 +6,20 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Requests\LoginRequest;
 use App\Models\User;
-
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
     public function register(RegisterRequest $request)
     {
+        $payload = $request->validated();
+
         $user = User::create([
-            'name' => $request->string('name'),
-            'email' => $request->string('email'),
-            'password' => Hash::make($request->string('password')),
-            'role' => 'member',
+            'name'      => (string) $payload['name'],
+            'email'     => (string) $payload['email'],
+            'password'  => Hash::make((string) $payload['password']),
+            'role'      => 'member',     // ✅ register selalu member
+            'is_active' => true,
         ]);
 
         $token = auth('api')->login($user);
@@ -45,13 +47,25 @@ class AuthController extends Controller
             ], 401);
         }
 
+        $user = auth('api')->user();
+
+        // optional: blokir kalau nonaktif
+        if (isset($user->is_active) && !$user->is_active) {
+            auth('api')->logout();
+            return response()->json([
+                'success' => false,
+                'message' => 'Account is deactivated',
+                'errors'  => (object)[],
+            ], 403);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Logged in',
             'data' => [
                 'token' => $token,
                 'token_type' => 'Bearer',
-                'user' => auth('api')->user(),
+                'user' => $user, // ✅ CI4 bisa ambil role dari sini (tanpa /me pun bisa)
             ],
         ], 200);
     }
