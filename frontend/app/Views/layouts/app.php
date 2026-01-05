@@ -4,89 +4,36 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><?= esc($title ?? 'Library') ?></title>
 
-    <title><?= esc($title ?? 'BookHouse') ?></title>
+    <!-- Bootstrap (kalau masih kamu pakai di halaman lain) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <!-- Google Font -->
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" referrerpolicy="no-referrer" />
+
+    <!-- Google Font: Poppins -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-    <!-- IMPORTANT: pastikan file ini ada di public/assets/css/app.css -->
+    <!-- App CSS -->
     <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/transactions.css') ?>">
 </head>
 
 <body>
     <div class="app-shell">
-
         <?= $this->include('partials/sidebar') ?>
 
         <main class="app-main">
-
-            <!-- TOPBAR -->
-            <header class="tb">
-                <div class="tb-left">
-                    <div class="tb-breadcrumb">
-                        <span><?= esc($crumbParent ?? 'Librarian') ?></span>
-                        <span class="tb-sep">/</span>
-                        <span><?= esc($crumbPage ?? 'Dashboard') ?></span>
-                    </div>
-
-                    <div>
-                        <div class="tb-title"><?= esc($tbTitle ?? ($title ?? 'BookHouse')) ?></div>
-                        <div class="tb-desc"><?= esc($tbDesc ?? 'Kelola data perpustakaan dengan rapi dan cepat.') ?></div>
-                    </div>
-                </div>
-
-                <div class="tb-right">
-                    <div class="tb-status">
-                        <span class="tb-dot"></span>
-                        <span>System Online</span>
-                    </div>
-
-                    <div class="tb-user">
-                        <div class="tb-avatar" aria-hidden="true"></div>
-                        <div>
-                            <div class="tb-username"><?= esc($userName ?? 'Librarian') ?></div>
-                            <div class="tb-userrole"><?= esc($userRole ?? 'Staff') ?></div>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
-            <div class="app-content">
+            <section class="app-content">
                 <?= $this->renderSection('content') ?>
-            </div>
-
+            </section>
         </main>
     </div>
 
-    <!-- JS kecil untuk dropdown menu di Books -->
-    <script>
-        // toggle menu "..." per row
-        document.addEventListener('click', function(e) {
-            const btn = e.target.closest('[data-bx-toggle]');
-            const allMenus = document.querySelectorAll('.bx-menu.open');
-
-            // klik tombol dots -> toggle menu row itu
-            if (btn) {
-                const id = btn.getAttribute('data-bx-toggle');
-                const menu = document.querySelector('[data-bx-menu="' + id + '"]');
-
-                // tutup menu lain dulu
-                allMenus.forEach(m => {
-                    if (m !== menu) m.classList.remove('open');
-                });
-
-                if (menu) menu.classList.toggle('open');
-                e.preventDefault();
-                return;
-            }
-
-            // klik di luar -> tutup semua
-            allMenus.forEach(m => m.classList.remove('open'));
-        });
-    </script>
+    <?= $this->renderSection('scripts') ?>
 </body>
 
 </html>

@@ -2,299 +2,247 @@
 <?= $this->section('content') ?>
 
 <?php
-// ===== Dummy data UI (nanti ganti REST API) =====
-$kpi = [
-    'books' => 1240,
-    'members' => 318,
-    'tx_today' => 27,
-    'overdue' => 9,
-];
+// =====================
+// DATA INPUT (AMAN)
+// =====================
+$kpi      = $kpi ?? [];
+$tx       = $tx ?? [];
+$txRecent = $txRecent ?? [];
 
-// transactions summary
-$tx = [
-    'borrow' => 18,
-    'return' => 9,
-    'processing' => 7,
-    'done' => 16,
-    'overdue' => 9,
-];
+// Books (optional)
+$booksList = $booksList ?? [];
+$booksMeta = $booksMeta ?? [];
 
-$txRecent = [
-    ['id' => 101, 'member' => 'Natan', 'book' => 'Atomic Habits', 'type' => 'Borrow', 'status' => 'Processing', 'time' => '09:12'],
-    ['id' => 102, 'member' => 'Alya', 'book' => "Don’t Make Me Think", 'type' => 'Return', 'status' => 'Done', 'time' => '08:40'],
-    ['id' => 103, 'member' => 'Raka', 'book' => 'The Power of Habit', 'type' => 'Borrow', 'status' => 'Overdue', 'time' => 'Yesterday'],
-];
+// Members pager khusus dashboard
+$membersPager = $membersPager ?? ['items' => [], 'total' => 0];
+$membersItems = $membersPager['items'] ?? [];
 
-// books snapshot
-$books = [
-    'new_this_week' => 8,
-    'available' => 972,
-    'borrowed' => 268,
-    'categories' => [
-        ['name' => 'UI/UX', 'count' => 210],
-        ['name' => 'Business', 'count' => 180],
-        ['name' => 'Programming', 'count' => 165],
-        ['name' => 'Self Dev', 'count' => 120],
-    ],
-    'most_borrowed' => [
-        ['title' => 'Atomic Habits', 'meta' => 'Borrowed 42x'],
-        ['title' => 'Ikigai', 'meta' => 'Borrowed 31x'],
-        ['title' => "Don’t Make Me Think", 'meta' => 'Borrowed 27x'],
-    ],
-];
+// =====================
+// URL (INI YANG KAMU KURANGIN -> bikin $uDash undefined)
+// =====================
+$uDash    = site_url('librarian/dashboard');
+$uBooks   = site_url('librarian/books');
+$uMembers = site_url('librarian/members');
+$uTx      = site_url('librarian/transactions');
 
-// members snapshot
-$members = [
-    'new' => 5,
-    'active_today' => 22,
-    'with_fines' => 9,
-    'top_active' => [
-        ['name' => 'Natan', 'meta' => '4 borrows this month'],
-        ['name' => 'Alya', 'meta' => '3 returns this month'],
-        ['name' => 'Raka', 'meta' => '2 borrows • 1 overdue'],
-    ],
-];
+// =====================
+// KPI TOTAL (lebih valid dari API)
+// =====================
+$booksTotal   = (int)($kpi['books_total'] ?? ($booksMeta['total'] ?? count($booksList)));
+$membersTotal = (int)($kpi['members_total'] ?? ((int)($membersPager['total'] ?? 0)));
 
-// helper untuk progress bar (maks 100)
-$pct = function (int $part, int $total) {
-    if ($total <= 0) return 0;
-    $v = (int) round(($part / $total) * 100);
-    return max(0, min(100, $v));
+// snapshot active/inactive dari KPI (hasil hit dari /api/members page 1)
+$activeSnap   = (int)($kpi['active_snap'] ?? 0);
+$inactiveSnap = (int)($kpi['inactive_snap'] ?? 0);
+
+// stock snapshot dari KPI
+$stockAvailSnap    = (int)($kpi['stock_avail'] ?? 0);
+$stockBorrowedSnap = (int)($kpi['stock_borrowed'] ?? 0);
+
+// Today
+$borrowToday  = (int)($tx['borrow_today'] ?? 0);
+$returnToday  = (int)($tx['return_today'] ?? 0);
+$overdueTotal = (int)($kpi['overdue_total'] ?? 0);
+$txToday      = (int)($kpi['tx_today'] ?? ($borrowToday + $returnToday));
+
+// badge status transaction
+$badgeTone = function ($raw) {
+    $s = strtolower((string)$raw);
+    if ($s === 'overdue') return 'danger';
+    return 'primary';
 };
-
-$txTotalToday = $tx['borrow'] + $tx['return'];
-$borrowPct = $pct($tx['borrow'], max(1, $txTotalToday));
-$returnPct = 100 - $borrowPct;
-
-$bookTotal = $books['available'] + $books['borrowed'];
-$availPct = $pct($books['available'], max(1, $bookTotal));
-$borrowedPct = 100 - $availPct;
-
-$memberRiskPct = $pct($members['with_fines'], max(1, $kpi['members']));
 ?>
 
-<div class="dashx">
-    <div class="dashx-head">
-        <div>
-            <div class="dashx-title">Dashboard</div>
-            <div class="dashx-sub">Gambaran data utama dari transaksi, buku, dan member.</div>
+<div class="dashv4">
+
+    <!-- Header -->
+    <div class="dashv4-head">
+        <div class="dashv4-greet">
+            <div class="dashv4-title">Good Morning, Librarian <span class="wave">👋</span></div>
+            <div class="dashv4-sub">Ringkas aktivitas hari ini, cek overdue, dan pantau koleksi — cepat & rapi.</div>
+        </div>
+
+        <div class="dashv4-actions">
+            <a class="iconbtn" href="<?= $uDash ?>" title="Refresh">
+                <i class="fa-solid fa-rotate-right"></i>
+            </a>
+            <a class="btnPrimary" href="<?= $uTx ?>" title="Open Transactions">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                Transactions
+            </a>
         </div>
     </div>
 
-    <!-- KPI (PENTING: pertahankan seperti screenshot kamu) -->
-    <div class="kpi-grid keep-kpi">
-        <a class="kpi kpi-link" href="<?= base_url('librarian/books') ?>" title="Lihat semua buku">
-            <div class="label">Total Books</div>
-            <div class="value red"><?= number_format($kpi['books']) ?></div>
-            <div class="kpi-foot">
-                <span class="hint">Koleksi terdaftar</span>
-                <span class="pill">+<?= (int)$books['new_this_week'] ?> minggu ini</span>
+    <!-- KPI 4 cards -->
+    <div class="kpi4v4">
+        <a class="kpiColorCard green kpiWhiteHover" href="<?= $uBooks ?>">
+            <div class="kpiColorCard-top">
+                <div class="kpiColorCard-label">TOTAL BOOKS</div>
+                <div class="kpiColorCard-ic"><i class="fa-solid fa-book"></i></div>
+            </div>
+            <div class="kpiColorCard-value"><?= number_format($booksTotal) ?></div>
+            <div class="kpiColorCard-foot">
+                <span>Stock snapshot: <?= $stockAvailSnap ?> available</span>
+                <span class="dotsep">•</span>
+                <span><?= $stockBorrowedSnap ?> borrowed</span>
             </div>
         </a>
 
-        <a class="kpi kpi-link" href="<?= base_url('members') ?>" title="Lihat semua member">
-            <div class="label">Members</div>
-            <div class="value blue"><?= number_format($kpi['members']) ?></div>
-            <div class="kpi-foot">
-                <span class="hint">Member aktif</span>
-                <span class="pill">+<?= (int)$members['new'] ?> baru</span>
+        <a class="kpiColorCard blue kpiWhiteHover" href="<?= $uMembers ?>">
+            <div class="kpiColorCard-top">
+                <div class="kpiColorCard-label">TOTAL MEMBERS</div>
+                <div class="kpiColorCard-ic"><i class="fa-solid fa-users"></i></div>
+            </div>
+            <div class="kpiColorCard-value"><?= number_format($membersTotal) ?></div>
+            <div class="kpiColorCard-foot">
+                <span>Active snapshot: <?= $activeSnap ?></span>
+                <span class="dotsep">•</span>
+                <span>Inactive snapshot: <?= $inactiveSnap ?></span>
             </div>
         </a>
 
-        <a class="kpi kpi-link" href="<?= base_url('librarian/transactions') ?>" title="Lihat transaksi">
-            <div class="label">Transactions</div>
-            <div class="value red"><?= number_format($kpi['tx_today']) ?></div>
-            <div class="kpi-foot">
-                <span class="hint">Hari ini</span>
-                <span class="pill">Borrow <?= (int)$tx['borrow'] ?></span>
+        <a class="kpiColorCard purple kpiWhiteHover" href="<?= $uTx ?>">
+            <div class="kpiColorCard-top">
+                <div class="kpiColorCard-label">TODAY ACTIVITY</div>
+                <div class="kpiColorCard-ic"><i class="fa-solid fa-right-left"></i></div>
+            </div>
+            <div class="kpiColorCard-value"><?= number_format($txToday) ?></div>
+            <div class="kpiColorCard-foot">
+                <span>Borrow: <?= $borrowToday ?></span>
+                <span class="dotsep">•</span>
+                <span>Return: <?= $returnToday ?></span>
             </div>
         </a>
 
-        <a class="kpi kpi-link kpi-soft" href="<?= base_url('librarian/transactions') ?>?status=overdue" title="Lihat overdue">
-            <div class="label">Overdue</div>
-            <div class="value red"><?= number_format($kpi['overdue']) ?></div>
-            <div class="kpi-foot">
-                <span class="hint">Perlu follow-up</span>
-                <span class="pill pill-red">urgent</span>
+        <a class="kpiColorCard orange kpiWhiteHover" href="<?= $uTx ?>?status=overdue">
+            <div class="kpiColorCard-top">
+                <div class="kpiColorCard-label">OVERDUE</div>
+                <div class="kpiColorCard-ic"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            </div>
+            <div class="kpiColorCard-value"><?= number_format($overdueTotal) ?></div>
+            <div class="kpiColorCard-foot">
+                <?= $overdueTotal > 0 ? 'Need follow-up' : 'All clear — nice!' ?>
             </div>
         </a>
     </div>
 
-    <!-- MAIN PANELS (3 domain: Transactions, Books, Members) -->
-    <div class="dashx-panels">
+    <!-- Main grid -->
+    <div class="dashv4-grid">
 
-        <!-- Transactions panel -->
-        <section class="card card-pad panel">
-            <div class="panel-head">
+        <!-- LEFT: Transactions -->
+        <section class="cardv4 cardv4-trans">
+            <div class="cardv4-head">
                 <div>
-                    <div class="panel-title">Transactions Snapshot</div>
-                    <div class="panel-sub">Ringkas status hari ini</div>
+                    <div class="cardv4-title">Transactions</div>
+                    <div class="cardv4-sub">Latest borrow/return — quick scan without noise</div>
                 </div>
-                <a class="link" href="<?= base_url('librarian/transactions') ?>">Open</a>
+                <a class="cardv4-link" href="<?= $uTx ?>">See all</a>
             </div>
 
-            <!-- Split bar Borrow vs Return -->
-            <div class="splitbar" title="Borrow vs Return">
-                <div class="split a" style="width:<?= $borrowPct ?>%"></div>
-                <div class="split b" style="width:<?= $returnPct ?>%"></div>
+            <div class="chipbar">
+                <span class="chip is-on">All</span>
+                <span class="chip">Borrow</span>
+                <span class="chip">Return</span>
+                <span class="chip danger">Overdue</span>
             </div>
 
-            <div class="splitmeta">
-                <div class="m">
-                    <span class="dot dot-red"></span> Borrow
-                    <b><?= (int)$tx['borrow'] ?></b>
+            <div class="tablev4">
+                <div class="tablev4-head">
+                    <div>MEMBER</div>
+                    <div>BOOK</div>
+                    <div>TYPE</div>
+                    <div>STATUS</div>
+                    <div class="ta-right">TIME</div>
                 </div>
-                <div class="m">
-                    <span class="dot dot-blue"></span> Return
-                    <b><?= (int)$tx['return'] ?></b>
-                </div>
-                <div class="m">
-                    <span class="badge red"><?= (int)$tx['overdue'] ?> overdue</span>
-                </div>
-            </div>
 
-            <!-- Mini recent list (ringkas, bukan table besar) -->
-            <div class="mini-list">
-                <?php foreach ($txRecent as $r): ?>
-                    <?php
-                    $s = strtolower($r['status']);
-                    $tone = ($s === 'overdue') ? 'red' : 'blue';
-                    ?>
-                    <a class="mini-row"
-                        href="<?= base_url('librarian/transactions/' . $r['id']) ?>"
-                        title="Detail transaksi #<?= esc($r['id']) ?>">
-                        <div class="mini-left">
-                            <div class="mini-title">#<?= esc($r['id']) ?> • <?= esc($r['member']) ?></div>
-                            <div class="mini-meta"><?= esc($r['type']) ?> • <?= esc($r['book']) ?> • <?= esc($r['time']) ?></div>
+                <div class="tablev4-body">
+                    <?php if (empty($txRecent)): ?>
+                        <div class="emptyv4">
+                            <div class="emptyv4-title">No transactions yet</div>
+                            <div class="emptyv4-desc">Begitu ada aktivitas, list terbaru akan muncul di sini.</div>
                         </div>
-                        <span class="badge <?= esc($tone) ?>"><?= esc($r['status']) ?></span>
+                    <?php else: ?>
+                        <?php foreach ($txRecent as $r): ?>
+                            <?php $tone = $badgeTone($r['status'] ?? ''); ?>
+                            <a class="rowv4" href="<?= $uTx ?>" title="Open Transactions">
+                                <div class="rowv4-main">
+                                    <div class="rowv4-strong"><?= esc($r['member'] ?? '—') ?></div>
+                                    <div class="rowv4-muted"><?= esc($r['book'] ?? '—') ?></div>
+                                </div>
+                                <div class="rowv4-cell"><?= esc($r['type'] ?? 'Borrow') ?></div>
+                                <div class="rowv4-cell">
+                                    <span class="pillx <?= $tone ?>"><?= esc($r['status'] ?? '-') ?></span>
+                                </div>
+                                <div class="rowv4-cell ta-right"><?= esc($r['time'] ?? '—') ?></div>
+                            </a>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </section>
+
+        <!-- RIGHT -->
+        <aside class="dashv4-right">
+
+            <!-- BOOKS OVERVIEW -->
+            <section class="cardv4 ovCard">
+                <div class="cardv4-head">
+                    <div>
+                        <div class="cardv4-title">Books Overview</div>
+                        <div class="cardv4-sub">Jumlah buku terdaftar + snapshot stok dari list saat ini</div>
+                    </div>
+                    <a class="cardv4-link" href="<?= $uBooks ?>">Open</a>
+                </div>
+
+                <div class="ovHero ovHero-blue">
+                    <div class="ovNum"><?= number_format($booksTotal) ?></div>
+                    <div class="ovLbl">Total books in system</div>
+                    <div class="ovMeta">
+                        Stock snapshot (page):
+                        <b><?= $stockAvailSnap ?></b> available •
+                        <b><?= $stockBorrowedSnap ?></b> borrowed
+                    </div>
+                </div>
+
+                <div class="ovActions">
+                    <a class="ovBtn primary" href="<?= $uBooks ?>">
+                        <i class="fa-solid fa-books"></i>
+                        View Books
+                        <span class="ovGo">→</span>
                     </a>
-                <?php endforeach; ?>
-            </div>
-
-            <div class="panel-foot">
-                <div class="footnote">Klik item untuk masuk ke detail transaksi.</div>
-            </div>
-        </section>
-
-        <!-- Books panel -->
-        <section class="card card-pad panel">
-            <div class="panel-head">
-                <div>
-                    <div class="panel-title">Books Snapshot</div>
-                    <div class="panel-sub">Ketersediaan & tren katalog</div>
                 </div>
-                <a class="link" href="<?= base_url('librarian/books') ?>">Browse</a>
-            </div>
+            </section>
 
-            <!-- Availability bar -->
-            <div class="meter">
-                <div class="meter-label">
-                    <span>Availability</span>
-                    <span class="muted"><?= (int)$books['available'] ?> available • <?= (int)$books['borrowed'] ?> borrowed</span>
+            <!-- MEMBERS OVERVIEW -->
+            <section class="cardv4 ovCard">
+                <div class="cardv4-head">
+                    <div>
+                        <div class="cardv4-title">Members Overview</div>
+                        <div class="cardv4-sub">Jumlah member terdaftar + snapshot status active dari list saat ini</div>
+                    </div>
+                    <a class="cardv4-link" href="<?= $uMembers ?>">Browse</a>
                 </div>
-                <div class="meterbar">
-                    <span class="fill blue" style="width:<?= $availPct ?>%"></span>
-                </div>
-            </div>
 
-            <!-- Top categories chips -->
-            <div class="chips">
-                <?php foreach ($books['categories'] as $c): ?>
-                    <a class="chip ghost" href="<?= base_url('librarian/books') ?>?category=<?= urlencode($c['name']) ?>" title="Filter kategori">
-                        <?= esc($c['name']) ?> <b><?= (int)$c['count'] ?></b>
+                <div class="ovHero ovHero-cream">
+                    <div class="ovNum"><?= number_format($membersTotal) ?></div>
+                    <div class="ovLbl">Total members registered</div>
+                    <div class="ovMeta">
+                        Status snapshot (page):
+                        <b><?= $activeSnap ?></b> active •
+                        <b><?= $inactiveSnap ?></b> inactive
+                    </div>
+                </div>
+
+                <div class="ovActions">
+                    <a class="ovBtn soft" href="<?= $uMembers ?>">
+                        <i class="fa-solid fa-users-gear"></i>
+                        Manage Members
+                        <span class="ovGo">→</span>
                     </a>
-                <?php endforeach; ?>
-            </div>
-
-            <!-- Most borrowed mini list -->
-            <div class="subsection">
-                <div class="subhead">
-                    <div class="subttl">Most Borrowed</div>
-                    <div class="submeta">minggu ini</div>
                 </div>
-                <div class="mini-list">
-    <?php foreach ($books['most_borrowed'] as $b): ?>
-        <a class="mini-row"
-           href="<?= base_url('librarian/books') ?>?search=<?= urlencode($b['title']) ?>"
-           title="Cari <?= esc($b['title']) ?> di daftar buku">
-            <div class="mini-left">
-                <div class="mini-title"><?= esc($b['title']) ?></div>
-                <div class="mini-meta"><?= esc($b['meta']) ?></div>
-            </div>
-            <span class="chev">›</span>
-        </a>
-    <?php endforeach; ?>
-</div>
-            </div>
+            </section>
 
-            <div class="panel-foot">
-                <div class="footnote">Klik kategori untuk filter buku.</div>
-            </div>
-        </section>
-
-        <!-- Members panel -->
-        <section class="card card-pad panel">
-            <div class="panel-head">
-                <div>
-                    <div class="panel-title">Members Snapshot</div>
-                    <div class="panel-sub">Aktivitas & risiko denda</div>
-                </div>
-                <a class="link" href="<?= base_url('members') ?>">Open</a>
-            </div>
-
-            <!-- Risk meter -->
-            <div class="meter">
-                <div class="meter-label">
-                    <span>Fine Risk</span>
-                    <span class="muted"><?= (int)$members['with_fines'] ?> member berisiko</span>
-                </div>
-                <div class="meterbar">
-                    <span class="fill red" style="width:<?= max(10, $memberRiskPct) ?>%"></span>
-                </div>
-            </div>
-
-            <!-- Small stats row -->
-            <div class="stats3">
-                <div class="s">
-                    <div class="s-lbl">New</div>
-                    <div class="s-val blue"><?= (int)$members['new'] ?></div>
-                </div>
-                <div class="s">
-                    <div class="s-lbl">Active Today</div>
-                    <div class="s-val"><?= (int)$members['active_today'] ?></div>
-                </div>
-                <div class="s">
-                    <div class="s-lbl">With Fines</div>
-                    <div class="s-val red"><?= (int)$members['with_fines'] ?></div>
-                </div>
-            </div>
-
-            <!-- Top active -->
-            <div class="subsection">
-                <div class="subhead">
-                    <div class="subttl">Top Active Members</div>
-                    <div class="submeta">ringkas</div>
-                </div>
-
-                <div class="mini-list">
-                    <?php foreach ($members['top_active'] as $m): ?>
-                        <a class="mini-row" href="<?= base_url('members') ?>" title="Lihat member list">
-                            <div class="mini-left">
-                                <div class="mini-title"><?= esc($m['name']) ?></div>
-                                <div class="mini-meta"><?= esc($m['meta']) ?></div>
-                            </div>
-                            <span class="chev">›</span>
-                        </a>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-
-            <div class="panel-foot">
-                <div class="footnote">Klik untuk menuju daftar member.</div>
-            </div>
-        </section>
-
+        </aside>
     </div>
 </div>
 

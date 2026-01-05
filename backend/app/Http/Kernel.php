@@ -67,5 +67,7 @@ class Kernel extends HttpKernel
 
         // Role-based middleware (example: middleware('role:librarian'))
         'role' => \App\Http\Middleware\RoleMiddleware::class,
+
+        'admin' => \App\Http\Middleware\EnsureAdminRole::class,
     ];
 }

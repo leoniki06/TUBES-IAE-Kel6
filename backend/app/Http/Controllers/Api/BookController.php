@@ -6,20 +6,23 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreBookRequest;
 use App\Http\Requests\UpdateBookRequest;
 use App\Models\Book;
-
 use Illuminate\Http\Request;
 
 class BookController extends Controller
 {
     public function index(Request $request)
     {
-        $q = $request->query('q');
+        $q = trim((string) $request->query('search', ''));
 
         $books = Book::query()
-            ->when($q, function ($query) use ($q) {
-                $query->where('title', 'like', "%{$q}%")
-                      ->orWhere('author', 'like', "%{$q}%")
-                      ->orWhere('isbn', 'like', "%{$q}%");
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($qq) use ($q) {
+                    $qq->where('title', 'like', "%{$q}%")
+                        ->orWhere('author', 'like', "%{$q}%")
+                        ->orWhere('isbn', 'like', "%{$q}%")
+                        ->orWhere('publisher', 'like', "%{$q}%")
+                        ->orWhere('genre', 'like', "%{$q}%");
+                });
             })
             ->orderByDesc('id')
             ->paginate(10);
@@ -27,32 +30,48 @@ class BookController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'OK',
-            'data' => $books->items(),
-            'meta' => [
-                'current_page' => $books->currentPage(),
-                'per_page' => $books->perPage(),
-                'total' => $books->total(),
-                'last_page' => $books->lastPage(),
-            ],
-        ], 200);
+            'data'    => $books,
+        ]);
     }
 
     public function store(StoreBookRequest $request)
     {
+        $total = (int) $request->input('stock_total', 0);
+
+        /**
+         * ✅ kalau user isi stock_available, pakai itu
+         * kalau tidak dikirim, default = total (biar masih masuk akal)
+         */
+        $avail = $request->has('stock_available')
+            ? (int) $request->input('stock_available', 0)
+            : $total;
+
+        // ✅ hard guard (double safety, walau seharusnya juga divalidasi di FormRequest)
+        if ($avail > $total) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => [
+                    'stock_available' => ['Stock Available tidak boleh lebih besar dari Stock Total.'],
+                ],
+            ], 422);
+        }
+
         $book = Book::create([
-            'isbn' => $request->input('isbn'),
-            'title' => $request->input('title'),
-            'author' => $request->input('author'),
-            'publisher' => $request->input('publisher'),
-            'year' => $request->input('year'),
-            'stock_total' => (int)$request->input('stock_total'),
-            'stock_available' => (int)$request->input('stock_total'),
+            'isbn'            => $request->input('isbn'),
+            'title'           => $request->input('title'),
+            'author'          => $request->input('author'),
+            'publisher'       => $request->input('publisher'),
+            'genre'           => $request->input('genre'),
+            'year'            => $request->input('year'),
+            'stock_total'     => $total,
+            'stock_available' => $avail,
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Created',
-            'data' => $book,
+            'data'    => $book,
         ], 201);
     }
 
@@ -63,37 +82,56 @@ class BookController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'OK',
-            'data' => $book,
-        ], 200);
+            'data'    => $book,
+        ]);
     }
 
     public function update(UpdateBookRequest $request, string $id)
     {
         $book = Book::findOrFail($id);
 
-        $newTotal = (int)$request->input('stock_total');
-        $oldTotal = (int)$book->stock_total;
-        $oldAvail = (int)$book->stock_available;
+        // total wajib ada di request (sesuai form kamu)
+        $total = (int) $request->input('stock_total', (int) $book->stock_total);
 
-        $delta = $newTotal - $oldTotal;
-        $newAvail = $oldAvail + $delta;
-        if ($newAvail < 0) $newAvail = 0;
+        /**
+         * ✅ pakai stock_available dari request kalau ada,
+         * kalau tidak ada, pertahankan existing (bukan delta)
+         */
+        $avail = $request->has('stock_available')
+            ? (int) $request->input('stock_available', (int) $book->stock_available)
+            : (int) $book->stock_available;
+
+        // clamp basic
+        if ($total < 0) $total = 0;
+        if ($avail < 0) $avail = 0;
+
+        // ✅ rule utama
+        if ($avail > $total) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors'  => [
+                    'stock_available' => ['Stock Available tidak boleh lebih besar dari Stock Total.'],
+                ],
+            ], 422);
+        }
 
         $book->update([
-            'isbn' => $request->input('isbn'),
-            'title' => $request->input('title'),
-            'author' => $request->input('author'),
-            'publisher' => $request->input('publisher'),
-            'year' => $request->input('year'),
-            'stock_total' => $newTotal,
-            'stock_available' => $newAvail,
+            'isbn'            => $request->input('isbn'),
+            'title'           => $request->input('title'),
+            'author'          => $request->input('author'),
+            'publisher'       => $request->input('publisher'),
+            'genre'           => $request->input('genre'),
+            'year'            => $request->input('year'),
+            'stock_total'     => $total,
+            'stock_available' => $avail,
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Updated',
-            'data' => $book->fresh(),
-        ], 200);
+            'data'    => $book->fresh(),
+        ]);
     }
 
     public function destroy(string $id)
@@ -104,7 +142,7 @@ class BookController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Deleted',
-            'data' => (object)[],
-        ], 200);
+            'data'    => (object) [],
+        ]);
     }
 }

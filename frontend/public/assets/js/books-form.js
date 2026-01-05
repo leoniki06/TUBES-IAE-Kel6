@@ -1,37 +1,67 @@
-(function () {
-    const form = document.getElementById("bookForm");
-    if (!form) return;
+(() => {
+    const qs = (sel, root = document) => root.querySelector(sel);
 
-    const setErr = (key, msg) => {
-        const el = form.querySelector(`[data-err="${key}"]`);
-        if (el) el.textContent = msg || "";
-    };
+    function bindStockValidation(form, totalSel, availSel, errSel) {
+        if (!form) return;
 
-    const clearAll = () => {
-        ["title", "author", "category", "stock", "isbn", "year"].forEach(k => setErr(k, ""));
-    };
+        const totalEl = qs(totalSel, form);
+        const availEl = qs(availSel, form);
+        const errEl = qs(errSel, form);
+        const submitBtn = qs(".js-submit", form);
 
-    form.addEventListener("submit", function (e) {
-        clearAll();
+        if (!totalEl || !availEl) return;
 
-        const title = form.title.value.trim();
-        const author = form.author.value.trim();
-        const category = form.category.value.trim();
-        const stock = Number(form.stock.value || 0);
-        const isbn = form.isbn.value.trim();
-        const year = form.year.value ? Number(form.year.value) : 0;
+        function setError(msg) {
+            if (errEl) errEl.textContent = msg || "";
+            if (submitBtn) submitBtn.disabled = !!msg;
+        }
 
-        let ok = true;
+        function readInt(el) {
+            const v = parseInt(el.value || "0", 10);
+            return Number.isFinite(v) ? v : 0;
+        }
 
-        if (!title) { setErr("title", "Title wajib diisi"); ok = false; }
-        if (!author) { setErr("author", "Author wajib diisi"); ok = false; }
-        if (!category) { setErr("category", "Category wajib diisi"); ok = false; }
+        function validate() {
+            const total = Math.max(0, readInt(totalEl));
+            const avail = Math.max(0, readInt(availEl));
 
-        if (Number.isNaN(stock) || stock < 0) { setErr("stock", "Stock tidak boleh negatif"); ok = false; }
-        if (form.year.value && (Number.isNaN(year) || year < 0)) { setErr("year", "Year tidak valid"); ok = false; }
+            // normalize displayed values only if negative typed
+            if (readInt(totalEl) < 0) totalEl.value = "0";
+            if (readInt(availEl) < 0) availEl.value = "0";
 
-        if (isbn && isbn.length < 10) { setErr("isbn", "ISBN minimal 10 karakter"); ok = false; }
+            if (avail > total) {
+                setError("Stock Available tidak boleh lebih besar dari Stock Total.");
+                return false;
+            }
 
-        if (!ok) e.preventDefault();
-    });
+            setError("");
+            return true;
+        }
+
+        totalEl.addEventListener("input", validate);
+        availEl.addEventListener("input", validate);
+
+        form.addEventListener("submit", (e) => {
+            if (!validate()) {
+                e.preventDefault();
+                availEl.focus();
+            }
+        });
+
+        validate();
+    }
+
+    bindStockValidation(
+        qs("#addForm"),
+        'input[name="stock_total"]',
+        'input[name="stock_available"]',
+        '[data-err="add_stock"]'
+    );
+
+    bindStockValidation(
+        qs("#editForm"),
+        "#e_stock_total",
+        "#e_stock_available",
+        '[data-err="edit_stock"]'
+    );
 })();

@@ -10,12 +10,23 @@ class RoleMiddleware
     public function handle(Request $request, Closure $next, ...$roles)
     {
         $user = $request->user();
+
         if (!$user) {
-            return response()->json(['success'=>false,'message'=>'Unauthorized'], 401);
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated',
+            ], 401);
         }
 
-        if (!in_array($user->role, $roles, true)) {
-            return response()->json(['success'=>false,'message'=>'Forbidden'], 403);
+        $role = strtolower((string) ($user->role ?? ''));
+
+        $allowed = array_map(fn($r) => strtolower((string)$r), $roles);
+
+        if (!in_array($role, $allowed, true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden. Role not allowed.',
+            ], 403);
         }
 
         return $next($request);
