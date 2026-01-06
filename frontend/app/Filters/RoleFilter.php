@@ -6,19 +6,21 @@ use CodeIgniter\Filters\FilterInterface;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
 
-class AuthFilter implements FilterInterface
+class RoleFilter implements FilterInterface
 {
     public function before(RequestInterface $request, $arguments = null)
     {
-        $token = session('token');
-        $user  = session('user');
+        $user = session('user');
+        $role = strtolower((string) ($user['role'] ?? ''));
 
-        if (!$token || !is_array($user)) {
-            // simpan tujuan biar setelah login bisa balik
-            session()->setFlashdata('redirectTo', current_url(true)->getPath());
+        $allowed = array_map(
+            fn($r) => strtolower((string) $r),
+            (array) ($arguments ?? [])
+        );
 
+        if (!$role || (!empty($allowed) && !in_array($role, $allowed, true))) {
             return redirect()->to('/')
-                ->with('error', 'Silakan login terlebih dahulu.')
+                ->with('error', 'Akses ditolak (role tidak sesuai).')
                 ->with('openModal', 'login');
         }
 

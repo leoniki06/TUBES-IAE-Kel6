@@ -18,7 +18,7 @@ $membersPager = $membersPager ?? ['items' => [], 'total' => 0];
 $membersItems = $membersPager['items'] ?? [];
 
 // =====================
-// URL (INI YANG KAMU KURANGIN -> bikin $uDash undefined)
+// URL
 // =====================
 $uDash    = site_url('librarian/dashboard');
 $uBooks   = site_url('librarian/books');
@@ -31,7 +31,7 @@ $uTx      = site_url('librarian/transactions');
 $booksTotal   = (int)($kpi['books_total'] ?? ($booksMeta['total'] ?? count($booksList)));
 $membersTotal = (int)($kpi['members_total'] ?? ((int)($membersPager['total'] ?? 0)));
 
-// snapshot active/inactive dari KPI (hasil hit dari /api/members page 1)
+// snapshot active/inactive dari KPI
 $activeSnap   = (int)($kpi['active_snap'] ?? 0);
 $inactiveSnap = (int)($kpi['inactive_snap'] ?? 0);
 
@@ -53,7 +53,7 @@ $badgeTone = function ($raw) {
 };
 ?>
 
-<div class="dashv4">
+<div class="dashv4 dashv4-fit">
 
     <!-- Header -->
     <div class="dashv4-head">
@@ -127,7 +127,7 @@ $badgeTone = function ($raw) {
     </div>
 
     <!-- Main grid -->
-    <div class="dashv4-grid">
+    <div class="dashv4-grid dashv4-gridFit">
 
         <!-- LEFT: Transactions -->
         <section class="cardv4 cardv4-trans">
@@ -182,10 +182,10 @@ $badgeTone = function ($raw) {
         </section>
 
         <!-- RIGHT -->
-        <aside class="dashv4-right">
+        <aside class="dashv4-right dashv4-rightFit">
 
             <!-- BOOKS OVERVIEW -->
-            <section class="cardv4 ovCard">
+            <section class="cardv4 ovCard cardv4-ov cardv4-ovBooks">
                 <div class="cardv4-head">
                     <div>
                         <div class="cardv4-title">Books Overview</div>
@@ -214,7 +214,7 @@ $badgeTone = function ($raw) {
             </section>
 
             <!-- MEMBERS OVERVIEW -->
-            <section class="cardv4 ovCard">
+            <section class="cardv4 ovCard cardv4-ov cardv4-ovMembers">
                 <div class="cardv4-head">
                     <div>
                         <div class="cardv4-title">Members Overview</div>
