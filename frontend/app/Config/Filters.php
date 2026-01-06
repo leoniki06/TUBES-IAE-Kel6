@@ -39,9 +39,7 @@ class Filters extends BaseFilters
         'honeypot'  => \CodeIgniter\Filters\Honeypot::class,
 
         // add these
-        'authGuard' => \App\Filters\AuthGuard::class,
-        'role'      => \App\Filters\RoleGuard::class,
-
+        'role' => \App\Filters\RoleFilter::class,
         'auth'   => \App\Filters\AuthFilter::class,
         'admin'  => \App\Filters\AdminFilter::class,
     ];

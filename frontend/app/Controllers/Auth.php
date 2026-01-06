@@ -22,7 +22,6 @@ class Auth extends BaseController
     {
         return view('auth/login', [
             'title'        => 'Login • Perpus Digital',
-            'defaultEmail' => 'admin@library.com',
         ]);
     }
 
@@ -48,7 +47,6 @@ class Auth extends BaseController
 
         return view('auth/splash', [
             'title'        => 'BookHouse • Welcome',
-            'defaultEmail' => 'admin@library.com',
             'flashError'   => $flashError,
             'flashSuccess' => $flashSuccess,
             'openModal'    => $openModal,
@@ -67,10 +65,9 @@ class Auth extends BaseController
                 ->with('openModal', 'login');
         }
 
-        // bersihin session lama
+        // reset session lama
         session()->remove(['token', 'user']);
 
-        // login ke backend
         $res = $this->api->post('/api/auth/login', [
             'json' => ['email' => $email, 'password' => $password],
         ]);
@@ -85,41 +82,29 @@ class Auth extends BaseController
         }
 
         $token = $payload['data']['token'] ?? null;
-        $user  = $payload['data']['user']  ?? null;
+        $user  = $payload['data']['user'] ?? null;
 
-        if (!$token) {
+        if (!$token || !is_array($user)) {
             return redirect()->to('/')
-                ->with('error', 'Token tidak ditemukan dari backend.')
+                ->with('error', 'Login gagal: token/user tidak valid dari backend.')
                 ->with('openModal', 'login');
         }
 
         session()->set('token', $token);
-
-        // Jangan bikin login gagal hanya karena /me bermasalah
-        if (!$user) {
-            $me = $this->api->get('/api/auth/me');
-            $mePayload = $me['data'] ?? [];
-
-            if (($me['ok'] ?? false) && ($mePayload['success'] ?? false) && isset($mePayload['data'])) {
-                $user = $mePayload['data'];
-            }
-        }
-
-        if (!$user || !is_array($user)) {
-            // token boleh ada, tapi kalau data user ga valid -> paksa login ulang biar aman
-            session()->remove(['token', 'user']);
-
-            return redirect()->to('/')
-                ->with('error', 'Login berhasil, tapi data user gagal dibaca.')
-                ->with('openModal', 'login');
-        }
-
         session()->set('user', $user);
+
+        // penting: bikin session stabil setelah login
+        session()->regenerate();
 
         $role = strtolower((string) ($user['role'] ?? ''));
 
-        // librarian -> halaman librarian
-        // member -> halaman member
+        // kalau sebelumnya user sempat mau akses halaman tertentu
+        $redirectTo = session()->getFlashdata('redirectTo');
+        if ($redirectTo) {
+            return redirect()->to('/' . ltrim($redirectTo, '/'))
+                ->with('success', 'Login berhasil.');
+        }
+
         if ($role === 'librarian') {
             return redirect()->to('/librarian/dashboard')->with('success', 'Login berhasil.');
         }
@@ -127,12 +112,12 @@ class Auth extends BaseController
         return redirect()->to('/member/dashboard')->with('success', 'Login berhasil.');
     }
 
+
     public function doRegister()
     {
         $name     = trim((string) $this->request->getPost('name'));
         $email    = trim((string) $this->request->getPost('email'));
         $password = (string) $this->request->getPost('password');
-        $role     = trim((string) $this->request->getPost('role')) ?: 'member'; // kalau di modal ada role
 
         if ($name === '' || $email === '' || $password === '') {
             return redirect()->to('/')
@@ -152,14 +137,11 @@ class Auth extends BaseController
                 ->with('openModal', 'register');
         }
 
-        // register ke backend
         $res = $this->api->post('/api/auth/register', [
             'json' => [
                 'name'     => $name,
                 'email'    => $email,
                 'password' => $password,
-                // kalau backend kamu support role, ini berguna
-                'role'     => $role,
             ],
         ]);
 
@@ -172,7 +154,6 @@ class Auth extends BaseController
                 ->with('openModal', 'register');
         }
 
-        // selesai register -> balik splash, buka modal login
         return redirect()->to('/')
             ->with('success', 'Register berhasil. Silakan login.')
             ->with('openModal', 'login');

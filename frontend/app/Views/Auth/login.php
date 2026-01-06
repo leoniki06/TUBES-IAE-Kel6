@@ -15,7 +15,7 @@
             --txt: #0f172a;
             --muted: #64748b;
             --primary: #2563eb;
-            --border: #e5e7eb;
+            --border: #e5e7eb
         }
 
         * {
@@ -156,11 +156,11 @@
                 <?= csrf_field() ?>
 
                 <label>Email</label>
-                <input type="email" name="email" value="<?= esc(old('email') ?? ($defaultEmail ?? '')) ?>" />
+                <input type="email" name="email" value="<?= esc(old('email') ?? '') ?>" autocomplete="email" />
                 <?php if (!empty($errors['email'])): ?><div class="err"><?= esc($errors['email']) ?></div><?php endif; ?>
 
                 <label>Password</label>
-                <input type="password" name="password" value="<?= esc($defaultPass ?? '') ?>" />
+                <input type="password" name="password" value="" autocomplete="current-password" />
                 <?php if (!empty($errors['password'])): ?><div class="err"><?= esc($errors['password']) ?></div><?php endif; ?>
 
                 <button class="btn" type="submit">Masuk</button>

@@ -55,29 +55,29 @@ $routes->get('transactions/(:segment)', static fn($any) => redirect()->to('/libr
 | Librarian Routes
 |--------------------------------------------------------------------------
 */
-$routes->group('librarian', static function ($routes) {
+$routes->group('librarian', ['filter' => 'auth'], static function ($routes) {
 
-    // Dashboard
-    $routes->get('dashboard', 'Librarian\Dashboard::index');
+    $routes->get('dashboard', 'Librarian\Dashboard::index', ['filter' => 'role:librarian']);
 
     // Books
-    $routes->get('books', 'Librarian\Books::index');
-    $routes->post('books', 'Librarian\Books::store');
-    $routes->post('books/(:num)/update', 'Librarian\Books::update/$1');
-    $routes->post('books/(:num)/delete', 'Librarian\Books::delete/$1');
+    $routes->get('books', 'Librarian\Books::index', ['filter' => 'role:librarian']);
+    $routes->post('books', 'Librarian\Books::store', ['filter' => 'role:librarian']);
+    $routes->post('books/(:num)/update', 'Librarian\Books::update/$1', ['filter' => 'role:librarian']);
+    $routes->post('books/(:num)/delete', 'Librarian\Books::delete/$1', ['filter' => 'role:librarian']);
 
     // Members
-    $routes->get('members', 'Librarian\Members::index');
-    $routes->get('members/new', 'Librarian\Members::new');
-    $routes->post('members', 'Librarian\Members::create');
-    $routes->get('members/(:num)', 'Librarian\Members::show/$1');
-    $routes->get('members/(:num)/edit', 'Librarian\Members::edit/$1');
-    $routes->post('members/(:num)/update', 'Librarian\Members::update/$1');
-    $routes->post('members/(:num)/delete', 'Librarian\Members::delete/$1');
+    $routes->get('members', 'Librarian\Members::index', ['filter' => 'role:librarian']);
+    $routes->get('members/new', 'Librarian\Members::new', ['filter' => 'role:librarian']);
+    $routes->post('members', 'Librarian\Members::create', ['filter' => 'role:librarian']);
+    $routes->get('members/(:num)', 'Librarian\Members::show/$1', ['filter' => 'role:librarian']);
+    $routes->get('members/(:num)/edit', 'Librarian\Members::edit/$1', ['filter' => 'role:librarian']);
+    $routes->post('members/(:num)/update', 'Librarian\Members::update/$1', ['filter' => 'role:librarian']);
+    $routes->post('members/(:num)/delete', 'Librarian\Members::delete/$1', ['filter' => 'role:librarian']);
 
     // Transactions
-    $routes->group('transactions', static function ($routes) {
+    $routes->group('transactions', ['filter' => 'role:librarian'], static function ($routes) {
         $routes->get('/', 'Librarian\Transactions::index');
         $routes->post('(:num)/return', 'Librarian\Transactions::markReturned/$1');
     });
 });
+

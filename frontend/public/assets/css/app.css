@@ -5384,3 +5384,146 @@ html.modal-open .bx-toasts {
         min-width: auto;
     }
 }
+
+/* ========================================================================== */
+/* DASHBOARD PATCH v4.1 — Fix right cards clipped + tidy typography           */
+/* Tempel di PALING BAWAH app.css                                             */
+/* ========================================================================== */
+
+/* 1) Root spacing dashboard sedikit dipadatkan biar semua muat */
+.dashv4.dashv4-fit {
+    --gap: 14px;
+    /* dari 16px -> 14px */
+}
+
+/* 2) Header rapih tapi tetap sama style */
+.dashv4.dashv4-fit .dashv4-head {
+    padding: 12px 14px;
+    /* dari 14/16 -> sedikit lebih compact */
+}
+
+.dashv4.dashv4-fit .dashv4-title {
+    font-size: 18px;
+    /* dari 20px */
+}
+
+.dashv4.dashv4-fit .dashv4-sub {
+    font-size: 12.5px;
+    /* dari 13px */
+}
+
+/* 3) KPI sedikit turun biar tidak “nge-press” grid bawah */
+.dashv4.dashv4-fit .kpiColorCard {
+    min-height: 112px;
+    /* dari 122px */
+    padding: 14px 14px 12px;
+}
+
+.dashv4.dashv4-fit .kpiColorCard-value {
+    font-size: 34px;
+    /* dari 38px */
+}
+
+.dashv4.dashv4-fit .kpiColorCard-foot {
+    font-size: 12.5px;
+    /* dari 13px */
+}
+
+/* 4) CARD padding & title turun tipis biar seimbang */
+.dashv4.dashv4-fit .cardv4 {
+    padding: 14px;
+    /* dari 16px */
+}
+
+.dashv4.dashv4-fit .cardv4-head {
+    margin-bottom: 10px;
+    /* dari 12px */
+}
+
+.dashv4.dashv4-fit .cardv4-title {
+    font-size: 17px;
+    /* dari 18px */
+}
+
+.dashv4.dashv4-fit .cardv4-sub {
+    font-size: 12.5px;
+    /* dari 13px */
+}
+
+/* 5) INI INTI FIX: jangan potong konten kolom kanan */
+.dashv4-grid.dashv4-gridFit {
+    overflow: visible;
+    /* sebelumnya hidden -> bikin card kanan kepotong */
+}
+
+/* Kolom kanan boleh scroll kalau tinggi 2 card melebihi viewport */
+.dashv4-right.dashv4-rightFit {
+    overflow: auto;
+    /* sebelumnya hidden */
+    padding-right: 2px;
+    /* biar scrollbar ga “nabrak” */
+    padding-bottom: 6px;
+    /* amanin bagian bawah tombol */
+}
+
+/* Pastikan card kanan tidak “dipaksa ngecil” */
+.dashv4-right.dashv4-rightFit>.cardv4 {
+    flex: 0 0 auto;
+}
+
+/* 6) Overview cards: rapihin hero + tombol biar tidak ketutup */
+.dashv4.dashv4-fit .ovHero {
+    padding: 12px 12px;
+}
+
+.dashv4.dashv4-fit .ovNum {
+    font-size: 28px;
+    /* dari 32px */
+}
+
+.dashv4.dashv4-fit .ovLbl {
+    font-size: 12.5px;
+    /* dari 13px */
+}
+
+.dashv4.dashv4-fit .ovMeta {
+    font-size: 12.25px;
+    /* sedikit turun */
+}
+
+/* Tombol dibuat lebih “fit” tapi tetap style sama */
+.dashv4.dashv4-fit .ovBtn {
+    height: 44px;
+    /* dari 48px */
+    border-radius: 16px;
+    /* dari 18px */
+    padding: 0 12px;
+    /* dari 14px */
+    font-size: 12.75px;
+    /* dari 13px */
+}
+
+/* 7) Table rows sedikit lebih rapat (biar area kanan tidak tertekan) */
+.dashv4.dashv4-fit .rowv4 {
+    padding: 10px 12px;
+    /* dari 12px */
+}
+
+.dashv4.dashv4-fit .rowv4-strong {
+    font-size: 13px;
+    /* dari 13.5px */
+}
+
+.dashv4.dashv4-fit .rowv4-muted,
+.dashv4.dashv4-fit .rowv4-cell {
+    font-size: 12.25px;
+    /* dari 12.5px */
+}
+
+/* 8) Responsive: saat 1 kolom, kolom kanan jangan “ketahan” overflow */
+@media (max-width: 1180px) {
+    .dashv4-right.dashv4-rightFit {
+        overflow: visible;
+        padding-right: 0;
+    }
+}

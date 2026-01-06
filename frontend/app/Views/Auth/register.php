@@ -15,7 +15,7 @@
             --txt: #0f172a;
             --muted: #64748b;
             --primary: #2563eb;
-            --border: #e5e7eb;
+            --border: #e5e7eb
         }
 
         * {
@@ -63,8 +63,7 @@
             margin: 14px 0 6px
         }
 
-        input,
-        select {
+        input {
             width: 100%;
             padding: 11px 12px;
             border: 1px solid var(--border);
@@ -120,7 +119,7 @@
     <div class="wrap">
         <div class="card">
             <h1>Register</h1>
-            <p>Buat akun untuk akses portal member / librarian</p>
+            <p>Buat akun untuk akses portal member</p>
 
             <?php if (!empty($message)): ?>
                 <div class="alert"><?= esc($message) ?></div>
@@ -130,22 +129,16 @@
                 <?= csrf_field() ?>
 
                 <label>Nama</label>
-                <input name="name" value="<?= esc(old('name')) ?>" placeholder="Nama lengkap">
+                <input name="name" value="<?= esc(old('name')) ?>" placeholder="Nama lengkap" autocomplete="name">
                 <?php if (!empty($errors['name'])): ?><div class="err"><?= esc($errors['name']) ?></div><?php endif; ?>
 
                 <label>Email</label>
-                <input type="email" name="email" value="<?= esc(old('email')) ?>" placeholder="nama@email.com">
+                <input type="email" name="email" value="<?= esc(old('email')) ?>" placeholder="nama@email.com" autocomplete="email">
                 <?php if (!empty($errors['email'])): ?><div class="err"><?= esc($errors['email']) ?></div><?php endif; ?>
 
                 <label>Password</label>
-                <input type="password" name="password" placeholder="minimal 6 karakter">
+                <input type="password" name="password" placeholder="minimal 6 karakter" autocomplete="new-password">
                 <?php if (!empty($errors['password'])): ?><div class="err"><?= esc($errors['password']) ?></div><?php endif; ?>
-
-                <label>Role</label>
-                <select name="role">
-                    <option value="member" <?= old('role') === 'member' ? 'selected' : ''; ?>>Member</option>
-                    <option value="librarian" <?= old('role') === 'librarian' ? 'selected' : ''; ?>>Librarian</option>
-                </select>
 
                 <button class="btn" type="submit">Buat Akun</button>
 
