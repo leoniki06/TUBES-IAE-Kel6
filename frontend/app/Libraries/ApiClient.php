@@ -13,11 +13,21 @@ class ApiClient
         // Ambil dari ENV CI4 (file .env CI4)
         $env = (string) env('BACKEND_API_BASEURL');
 
+        // Trim spasi & petik (kalau user nulis '...' atau "...")
+        $env = trim($env);
+        $env = trim($env, "\"'");
+
         $this->baseUrl = rtrim($env, '/');
 
         // fallback untuk local dev
         if ($this->baseUrl === '') {
             $this->baseUrl = 'http://127.0.0.1:9000';
+        }
+
+        // Anti dobel /api kalau env salah isi .../api
+        if (str_ends_with($this->baseUrl, '/api')) {
+            $this->baseUrl = substr($this->baseUrl, 0, -4);
+            $this->baseUrl = rtrim($this->baseUrl, '/');
         }
     }
 
@@ -41,11 +51,6 @@ class ApiClient
         return $this->request('DELETE', $path, $options);
     }
 
-    private function fullUrl(string $path): string
-    {
-        return rtrim($this->baseUrl, '/') . '/' . ltrim($path, '/');
-    }
-
     private function buildHeaders(array $optionsHeaders = []): array
     {
         $headers = [
@@ -67,11 +72,26 @@ class ApiClient
         return $headers;
     }
 
+    private function normalizePath(string $path): string
+    {
+        // kita pakai baseURI, jadi di request gunakan path relatif (tanpa host)
+        // tetap izinkan user ngirim "/api/auth/login" atau "api/auth/login"
+        $path = '/' . ltrim($path, '/');
+
+        // Anti dobel /api/api kalau ada yang salah kirim path
+        if (str_starts_with($path, '/api/api/')) {
+            $path = substr($path, 4); // hapus "/api"
+        }
+
+        return $path;
+    }
+
     private function request(string $method, string $path, array $options = []): array
     {
-        $url = $this->fullUrl($path);
+        $path = $this->normalizePath($path);
 
         $client = Services::curlrequest([
+            'baseURI'     => $this->baseUrl,
             'timeout'     => 25,
             'http_errors' => false,
             'verify'      => false, // dev only; kalau https production, ubah true
@@ -85,7 +105,7 @@ class ApiClient
         }
 
         try {
-            $resp   = $client->request($method, $url, $options);
+            $resp   = $client->request($method, $path, $options);
             $status = (int) $resp->getStatusCode();
             $raw    = (string) $resp->getBody();
 
@@ -101,10 +121,10 @@ class ApiClient
             return [
                 'ok'     => $status >= 200 && $status < 300,
                 'status' => $status,
-                'data'   => $data,     // array|null
-                'raw'    => $raw,      // simpan body asli untuk debug
+                'data'   => $data,
+                'raw'    => $raw,
                 'error'  => null,
-                'url'    => $url,
+                'url'    => rtrim($this->baseUrl, '/') . $path,
                 'method' => $method,
             ];
         } catch (\Throwable $e) {
@@ -114,7 +134,7 @@ class ApiClient
                 'data'   => null,
                 'raw'    => null,
                 'error'  => $e->getMessage(),
-                'url'    => $url,
+                'url'    => rtrim($this->baseUrl, '/') . $path,
                 'method' => $method,
             ];
         }
