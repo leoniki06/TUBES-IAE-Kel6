@@ -460,8 +460,8 @@ class ComposerStaticInitd39de7b68a3e8e76145ccef9e1746888
         ),
         'Psr\\Http\\Message\\' => 
         array (
-            0 => __DIR__ . '/..' . '/psr/http-message/src',
-            1 => __DIR__ . '/..' . '/psr/http-factory/src',
+            0 => __DIR__ . '/..' . '/psr/http-factory/src',
+            1 => __DIR__ . '/..' . '/psr/http-message/src',
         ),
         'Psr\\Http\\Client\\' => 
         array (
@@ -497,8 +497,8 @@ class ComposerStaticInitd39de7b68a3e8e76145ccef9e1746888
         ),
         'Nette\\' => 
         array (
-            0 => __DIR__ . '/..' . '/nette/utils/src',
-            1 => __DIR__ . '/..' . '/nette/schema/src',
+            0 => __DIR__ . '/..' . '/nette/schema/src',
+            1 => __DIR__ . '/..' . '/nette/utils/src',
         ),
         'Monolog\\' => 
         array (
@@ -676,11 +676,14 @@ class ComposerStaticInitd39de7b68a3e8e76145ccef9e1746888
         'App\\GraphQL\\Queries\\MyTransactionQuery' => __DIR__ . '/../..' . '/app/GraphQL/Queries/MyTransactionQuery.php',
         'App\\Http\\Controllers\\Api\\AuthController' => __DIR__ . '/../..' . '/app/Http/Controllers/Api/AuthController.php',
         'App\\Http\\Controllers\\Api\\BookController' => __DIR__ . '/../..' . '/app/Http/Controllers/Api/BookController.php',
+        'App\\Http\\Controllers\\Api\\LoanController' => __DIR__ . '/../..' . '/app/Http/Controllers/Api/LoanController.php',
+        'App\\Http\\Controllers\\Api\\MemberController' => __DIR__ . '/../..' . '/app/Http/Controllers/Api/MemberController.php',
         'App\\Http\\Controllers\\Api\\TransactionController' => __DIR__ . '/../..' . '/app/Http/Controllers/Api/TransactionController.php',
         'App\\Http\\Controllers\\Controller' => __DIR__ . '/../..' . '/app/Http/Controllers/Controller.php',
         'App\\Http\\Kernel' => __DIR__ . '/../..' . '/app/Http/Kernel.php',
         'App\\Http\\Middleware\\Authenticate' => __DIR__ . '/../..' . '/app/Http/Middleware/Authenticate.php',
         'App\\Http\\Middleware\\EncryptCookies' => __DIR__ . '/../..' . '/app/Http/Middleware/EncryptCookies.php',
+        'App\\Http\\Middleware\\EnsureAdminRole' => __DIR__ . '/../..' . '/app/Http/Middleware/EnsureAdminRole.php',
         'App\\Http\\Middleware\\LogApiRequests' => __DIR__ . '/../..' . '/app/Http/Middleware/LogApiRequests.php',
         'App\\Http\\Middleware\\LogAuthApi' => __DIR__ . '/../..' . '/app/Http/Middleware/LogAuthApi.php',
         'App\\Http\\Middleware\\PreventRequestsDuringMaintenance' => __DIR__ . '/../..' . '/app/Http/Middleware/PreventRequestsDuringMaintenance.php',
@@ -695,8 +698,12 @@ class ComposerStaticInitd39de7b68a3e8e76145ccef9e1746888
         'App\\Http\\Requests\\LoginRequest' => __DIR__ . '/../..' . '/app/Http/Requests/LoginRequest.php',
         'App\\Http\\Requests\\RegisterRequest' => __DIR__ . '/../..' . '/app/Http/Requests/RegisterRequest.php',
         'App\\Http\\Requests\\StoreBookRequest' => __DIR__ . '/../..' . '/app/Http/Requests/StoreBookRequest.php',
+        'App\\Http\\Requests\\StoreLoanRequest' => __DIR__ . '/../..' . '/app/Http/Requests/StoreLoanRequest.php',
+        'App\\Http\\Requests\\StoreMemberRequest' => __DIR__ . '/../..' . '/app/Http/Requests/StoreMemberRequest.php',
         'App\\Http\\Requests\\UpdateBookRequest' => __DIR__ . '/../..' . '/app/Http/Requests/UpdateBookRequest.php',
+        'App\\Http\\Requests\\UpdateMemberRequest' => __DIR__ . '/../..' . '/app/Http/Requests/UpdateMemberRequest.php',
         'App\\Models\\Book' => __DIR__ . '/../..' . '/app/Models/Book.php',
+        'App\\Models\\Loan' => __DIR__ . '/../..' . '/app/Models/Loan.php',
         'App\\Models\\Transaction' => __DIR__ . '/../..' . '/app/Models/Transaction.php',
         'App\\Models\\User' => __DIR__ . '/../..' . '/app/Models/User.php',
         'App\\Providers\\AppServiceProvider' => __DIR__ . '/../..' . '/app/Providers/AppServiceProvider.php',
@@ -816,6 +823,7 @@ class ComposerStaticInitd39de7b68a3e8e76145ccef9e1746888
         'Cron\\MinutesField' => __DIR__ . '/..' . '/dragonmantank/cron-expression/src/Cron/MinutesField.php',
         'Cron\\MonthField' => __DIR__ . '/..' . '/dragonmantank/cron-expression/src/Cron/MonthField.php',
         'Database\\Factories\\UserFactory' => __DIR__ . '/../..' . '/database/factories/UserFactory.php',
+        'Database\\Seeders\\AdminUserSeeder' => __DIR__ . '/../..' . '/database/seeders/AdminUserSeeder.php',
         'Database\\Seeders\\DatabaseSeeder' => __DIR__ . '/../..' . '/database/seeders/DatabaseSeeder.php',
         'Database\\Seeders\\LibrarianSeeder' => __DIR__ . '/../..' . '/database/seeders/LibrarianSeeder.php',
         'DateError' => __DIR__ . '/..' . '/symfony/polyfill-php83/Resources/stubs/DateError.php',

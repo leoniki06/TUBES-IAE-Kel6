@@ -1,0 +1,199 @@
+/* =========================================
+   BOOK DETAIL STYLING
+   ========================================= */
+
+/* 1. CONTAINER KARTU UTAMA */
+.detail-wrapper {
+    background: #ffffff;
+    border-radius: 24px;       /* Sudut membulat besar modern */
+    padding: 35px;
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.05); /* Bayangan halus */
+    display: flex;
+    gap: 40px;                 /* Jarak antara Gambar dan Teks */
+    align-items: flex-start;
+    margin-top: 10px;
+    border: 1px solid #f1f5f9;
+}
+
+/* 2. COVER BUKU (KIRI) */
+.detail-cover {
+    width: 300px;              /* Lebar tetap agar proporsional */
+    flex-shrink: 0;            /* Mencegah gambar tergencet */
+    border-radius: 16px;
+    overflow: hidden;
+    background: #e2e8f0;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    position: relative;
+}
+
+.detail-cover img {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: cover;
+    aspect-ratio: 2/3;         /* Memaksa rasio potret buku */
+}
+
+/* 3. INFORMASI BUKU (KANAN) */
+.detail-info {
+    flex: 1;                   /* Mengambil sisa ruang */
+    width: 100%;
+}
+
+.detail-info h2 {
+    font-size: 32px;
+    font-weight: 800;
+    color: #1E293B;            /* Warna Slate Gelap */
+    margin-bottom: 8px;
+    line-height: 1.2;
+    letter-spacing: -0.5px;
+}
+
+.detail-info .author {
+    font-size: 16px;
+    color: #64748B;            /* Warna Abu-abu */
+    margin-bottom: 25px;
+    font-weight: 500;
+}
+
+/* 4. GRID DATA (Tahun, Penerbit, Stok) */
+.info-grid {
+    display: grid;
+    /* Membuat kolom otomatis menyesuaikan lebar */
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+    background: #F8FAFC;       /* Background abu sangat muda */
+    padding: 20px;
+    border-radius: 16px;
+    border: 1px solid #F1F5F9;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.info-item strong {
+    font-size: 11px;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+    font-weight: 700;
+}
+
+.info-item span {
+    font-size: 15px;
+    font-weight: 700;
+    color: #334155;
+}
+
+/* 5. DESKRIPSI / SINOPSIS */
+.description {
+    color: #475569;
+    line-height: 1.7;
+    margin-bottom: 35px;
+    font-size: 15px;
+    text-align: justify;
+    padding-bottom: 20px;
+    border-bottom: 1px dashed #E2E8F0;
+}
+
+.description strong {
+    display: block;
+    margin-bottom: 8px;
+    color: #1E293B;
+}
+
+/* 6. TOMBOL AKSI */
+.btn-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: #3DB2FF;       /* Warna Primary Biru */
+    color: #fff;
+    padding: 14px 32px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 15px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 6px -1px rgba(61, 178, 255, 0.2);
+}
+
+.btn-action:hover {
+    background: #2563EB;       /* Biru lebih gelap saat hover */
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(61, 178, 255, 0.3);
+}
+
+.btn-disabled {
+    background: #CBD5E1;
+    color: #64748B;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.btn-disabled:hover {
+    transform: none;
+    background: #CBD5E1;
+}
+
+/* 7. LINK KEMBALI */
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #64748B;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 20px;
+    transition: 0.2s;
+    text-decoration: none;
+}
+
+.back-link:hover {
+    color: #3DB2FF;
+    transform: translateX(-5px); /* Efek geser kiri sedikit */
+}
+
+/* =========================================
+   RESPONSIVE (TAMPILAN HP)
+   ========================================= */
+@media (max-width: 900px) {
+    .detail-wrapper {
+        flex-direction: column; /* Gambar di atas, teks di bawah */
+        padding: 24px;
+    }
+
+    .detail-cover {
+        width: 100%;
+        max-width: 220px;       /* Batasi lebar gambar di HP */
+        margin: 0 auto 24px auto; /* Tengah */
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+
+    .detail-info {
+        text-align: center;     /* Teks rata tengah di HP */
+    }
+
+    .detail-info h2 {
+        font-size: 24px;
+    }
+
+    .info-grid {
+        text-align: left;       /* Grid info tetap rata kiri agar rapi */
+        grid-template-columns: repeat(2, 1fr); /* 2 Kolom di HP */
+    }
+
+    .description {
+        text-align: left;
+    }
+
+    .btn-action {
+        width: 100%;            /* Tombol full width di HP */
+    }
+}
