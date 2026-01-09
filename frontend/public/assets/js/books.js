@@ -1,100 +1,219 @@
-(() => {
-    const qs = (sel, root = document) => root.querySelector(sel);
-    const qsa = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+let page = 1;
 
-    // ===== MODAL =====
-    function openModal(id) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.classList.add("is-open");
-        document.documentElement.classList.add("modal-open");
-    }
+let query = '';
 
-    function closeModal(el) {
-        if (!el) return;
-        el.classList.remove("is-open");
-        document.documentElement.classList.remove("modal-open");
-    }
 
-    // open modal
-    qsa("[data-open]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-            const target = btn.getAttribute("data-open");
-            if (!target) return;
 
-            if (target === "modal-edit") {
-                // fill edit form
-                const id = btn.dataset.id;
-                const editForm = qs("#editForm");
-                if (editForm && id) {
-                    editForm.setAttribute("action", `${window.BOOKS_PAGE?.baseBooksUrl}/${id}/update`);
-                }
+document.addEventListener('DOMContentLoaded', () => {
 
-                const setVal = (idInput, v) => {
-                    const el = qs(`#${idInput}`);
-                    if (el) el.value = v ?? "";
-                };
+    if (document.getElementById('bookList')) {
 
-                setVal("e_isbn", btn.dataset.isbn);
-                setVal("e_year", btn.dataset.year);
-                setVal("e_title", btn.dataset.title);
-                setVal("e_author", btn.dataset.author);
-                setVal("e_publisher", btn.dataset.publisher);
-                setVal("e_stock_total", btn.dataset.stock_total);
-                setVal("e_stock_available", btn.dataset.stock_available);
+        loadBooks();
 
-                const genreSel = qs("#e_genre");
-                if (genreSel) genreSel.value = btn.dataset.genre ?? "";
-            }
+        document.getElementById('searchInput').addEventListener('input', e => {
 
-            openModal(target);
+            query = e.target.value;
+
+            page = 1;
+
+            loadBooks();
+
         });
-    });
 
-    // close buttons
-    qsa("[data-close]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-            const overlay = btn.closest(".m-overlay");
-            closeModal(overlay);
-        });
-    });
+        document.getElementById('prevBtn').onclick = () => {
 
-    // click overlay to close
-    qsa(".m-overlay").forEach((ov) => {
-        ov.addEventListener("click", (e) => {
-            if (e.target === ov) closeModal(ov);
-        });
-    });
+            if (page > 1) page--;
 
-    // ESC close
-    document.addEventListener("keydown", (e) => {
-        if (e.key !== "Escape") return;
-        const opened = qs(".m-overlay.is-open");
-        if (opened) closeModal(opened);
-    });
+            loadBooks();
 
-    // open add modal if validation error from server
-    if (window.BOOKS_PAGE?.openAddOnError) {
-        openModal("modal-add");
+        };
+
+        document.getElementById('nextBtn').onclick = () => {
+
+            page++;
+
+            loadBooks();
+
+        };
+
     }
 
-    // ===== TOAST =====
-    function removeToast(t) {
-        if (!t) return;
-        t.classList.add("is-leave");
-        setTimeout(() => t.remove(), 180);
+
+
+    if (typeof BOOK_ID !== 'undefined') {
+
+        loadDetail();
+
     }
 
-    qsa(".js-toast").forEach((t) => {
-        const ms = parseInt(t.getAttribute("data-autohide") || "0", 10);
-        const closeBtn = qs("[data-toast-close]", t);
+});
 
-        if (closeBtn) {
-            closeBtn.addEventListener("click", () => removeToast(t));
+
+
+/**
+
+ * =====================
+
+ * LIST BOOKS
+
+ * =====================
+
+ */
+
+async function loadBooks() {
+
+    setState('loading');
+
+    try {
+
+        const res = await fetch(`${API_BASE}/books?page=${page}&search=${query}`);
+
+        const json = await res.json();
+
+
+
+        if (!json.data || json.data.length === 0) {
+
+            setState('empty');
+
+            return;
+
         }
 
-        if (ms > 0) {
-            setTimeout(() => removeToast(t), ms);
-        }
+
+
+        renderBooks(json.data);
+
+        document.getElementById('pageInfo').innerText = `Page ${page}`;
+
+        setState('success');
+
+    } catch (err) {
+
+        setState('error');
+
+    }
+
+}
+
+
+
+function renderBooks(books) {
+
+    const el = document.getElementById('bookList');
+
+    el.innerHTML = '';
+
+
+
+    books.forEach(b => {
+
+        el.innerHTML += `
+
+        <div class="col-md-3">
+
+            <div class="card h-100">
+
+                <div class="card-body">
+
+                    <h6>${b.title}</h6>
+
+                    <p class="text-muted">${b.author}</p>
+
+                    <a href="/member/books/${b.id}" class="btn btn-sm btn-primary">
+
+                        Detail
+
+                    </a>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        `;
+
     });
-})();
+
+}
+
+
+
+/**
+
+ * =====================
+
+ * DETAIL BOOK
+
+ * =====================
+
+ */
+
+async function loadDetail() {
+
+    setState('loading');
+
+    try {
+
+        const res = await fetch(`${API_BASE}/books/${BOOK_ID}`);
+
+        const json = await res.json();
+
+
+
+        const b = json.data;
+
+        document.getElementById('title').innerText = b.title;
+
+        document.getElementById('author').innerText = b.author;
+
+        document.getElementById('year').innerText = b.year;
+
+        document.getElementById('stock').innerText = b.stock;
+
+        document.getElementById('description').innerText = b.description;
+
+
+
+        document.getElementById('detailCard').classList.remove('d-none');
+
+        setState('success');
+
+    } catch {
+
+        setState('error');
+
+    }
+
+}
+
+
+
+/**
+
+ * =====================
+
+ * UI STATE
+
+ * =====================
+
+ */
+
+function setState(type) {
+
+    const el = document.getElementById('state');
+
+    if (!el) return;
+
+
+
+    if (type === 'loading') el.innerText = '⏳ Memuat data...';
+
+    if (type === 'empty') el.innerText = '📭 Buku tidak ditemukan.';
+
+    if (type === 'error') el.innerText = '❌ Gagal memuat data.';
+
+    if (type === 'success') el.innerText = '';
+
+}

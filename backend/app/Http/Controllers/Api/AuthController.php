@@ -18,7 +18,7 @@ class AuthController extends Controller
             'name'      => (string) $payload['name'],
             'email'     => (string) $payload['email'],
             'password'  => Hash::make((string) $payload['password']),
-            'role'      => 'member',     // ✅ register selalu member
+            'role'      => 'member',     
             'is_active' => true,
         ]);
 

@@ -29,35 +29,59 @@ $routes->setAutoRoute(false);
 */
 $routes->get('/', 'Auth::splash');
 
+/*
+|--------------------------------------------------------------------------
+| Auth Routes (LOGIN & REGISTER)
+|--------------------------------------------------------------------------
+*/
 $routes->group('auth', static function ($routes) {
+
     $routes->get('login', 'Auth::login');
     $routes->get('register', 'Auth::register');
 
     $routes->post('login', 'Auth::doLogin');
     $routes->post('register', 'Auth::doRegister');
 
+    // ⚠️ ROUTE LAMA TETAP ADA (TIDAK DIHAPUS)
     $routes->get('logout', 'Auth::logout');
 });
 
+/*
+|--------------------------------------------------------------------------
+| 🔥 LOGOUT GLOBAL (SOLUSI 404)
+|--------------------------------------------------------------------------
+| Bisa dipanggil dari:
+| - /member/dashboard
+| - /librarian/dashboard
+| - sidebar mana pun
+*/
+$routes->get('logout', 'Auth::logout');
+
+/*
+|--------------------------------------------------------------------------
+| Debug
+|--------------------------------------------------------------------------
+*/
 $routes->get('debug', 'Debug::index');
 
 /*
 |--------------------------------------------------------------------------
 | Alias (biar /transactions tetap jalan)
 |--------------------------------------------------------------------------
-| Jadi kalau ada link lama /transactions, diarahkan ke /librarian/transactions
 */
 $routes->get('transactions', static fn() => redirect()->to('/librarian/transactions'));
 $routes->get('transactions/(:segment)', static fn($any) => redirect()->to('/librarian/transactions/' . $any));
 
 /*
 |--------------------------------------------------------------------------
-| Librarian Routes
+| Librarian Routes (TETAP, TIDAK DIHAPUS)
 |--------------------------------------------------------------------------
 */
 $routes->group('librarian', ['filter' => 'auth'], static function ($routes) {
 
-    $routes->get('dashboard', 'Librarian\Dashboard::index', ['filter' => 'role:librarian']);
+    $routes->get('dashboard', 'Librarian\Dashboard::index', [
+        'filter' => 'role:librarian'
+    ]);
 
     // Books
     $routes->get('books', 'Librarian\Books::index', ['filter' => 'role:librarian']);
@@ -79,5 +103,41 @@ $routes->group('librarian', ['filter' => 'auth'], static function ($routes) {
         $routes->get('/', 'Librarian\Transactions::index');
         $routes->post('(:num)/return', 'Librarian\Transactions::markReturned/$1');
     });
+
+    $routes->group('member', ['filter' => 'auth'], static function ($routes) {
+        $routes->get('books', 'Member\BookController::index');
+        $routes->get('books/(:num)', 'Member\BookController::detail/$1');
+    });
+});
+
+$routes->group('member', ['filter' => 'auth'], static function ($routes) {
+
+    $routes->get('dashboard', 'Member\Dashboard::index', [
+        'filter' => 'role:member'
+    ]);
+
+    $routes->get('books', 'Member\BookController::index', [
+        'filter' => 'role:member'
+    ]);
+
+    $routes->get('books/(:num)', 'Member\BookController::detail/$1', [
+        'filter' => 'role:member'
+    ]);
+});
+
+$routes->group('member', function ($routes) {
+    $routes->get('caribuku', 'Member\BookController::index');
+    $routes->get('books/detail/(:num)', 'Member\BookController::detail/$1');
+});
+
+$routes->group('member', ['filter' => 'auth'], function($routes) {
+    // Dashboard
+    $routes->get('dashboard', 'Member\DashboardController::index');
+
+    // Fitur Buku & Search
+    $routes->get('books', 'Member\BookController::index');
+
+    // Fitur Detail Buku (INI YG BIKIN 404 KALAU TIDAK ADA)
+    $routes->get('books/detail/(:num)', 'Member\BookController::detail/$1');
 });
 
