@@ -3,29 +3,15 @@
 namespace App\Controllers\Librarian;
 
 use App\Controllers\BaseController;
-use App\Libraries\ApiClient;
+use App\Models\UserModel;
 
 class Members extends BaseController
 {
-    private ApiClient $api;
+    private UserModel $users;
 
     public function __construct()
     {
-        $this->api = new ApiClient();
-    }
-
-    private function unwrap(array $res): array
-    {
-        $payload = $res['data'] ?? [];
-
-        return [
-            'ok'      => (bool) ($res['ok'] ?? false),
-            'status'  => (int) ($res['status'] ?? 0),
-            'success' => (bool) ($payload['success'] ?? false),
-            'message' => (string) ($payload['message'] ?? ''),
-            'data'    => $payload['data'] ?? null,
-            'errors'  => $payload['errors'] ?? [],
-        ];
+        $this->users = new UserModel();
     }
 
     public function index()
@@ -34,93 +20,75 @@ class Members extends BaseController
         $page = (int) ($this->request->getGet('page') ?? 1);
         if ($page < 1) $page = 1;
 
-        $res = $this->api->get('/api/members', [
-            'query' => array_filter([
-                'search' => $q !== '' ? $q : null,
-                'page'   => $page,
-            ])
-        ]);
+        $perPage = 10;
+        $offset  = ($page - 1) * $perPage;
 
-        // ✅ KUNCI: 401 = token kosong/invalid/expired
-        if (($res['status'] ?? 0) === 401) {
-            session()->remove('token');
+        // ✅ builder() dari model sudah otomatis FROM users
+        $builder = $this->users->builder();
 
-            // kalau kamu punya halaman login CI4:
-            // return redirect()->to('/auth/login')->with('error', 'Sesi habis. Login ulang.');
+        // filter role
+        $builder->where('role', 'member');
 
-            return view('librarian/members/index', [
-                'q'       => $q,
-                'members' => $this->emptyPager(),
-                'flash'   => ['type' => 'error', 'msg' => 'HTTP 401 (Unauthorized). Token tidak ada / tidak valid. Silakan login ulang.'],
-            ]);
+        // opsional: hanya yang aktif
+        // $builder->where('is_active', 1);
+
+        if ($q !== '') {
+            $builder->groupStart()
+                ->like('name', $q)
+                ->orLike('email', $q)
+                ->orLike('phone', $q)
+            ->groupEnd();
         }
 
-        // kalau API gagal (HTTP 0/500/dll)
-        if (!($res['ok'] ?? false)) {
-            $msg = 'Gagal akses API members. HTTP ' . ($res['status'] ?? 0);
-            if (!empty($res['error'])) $msg .= ' — ' . $res['error'];
+        $builder->orderBy('id', 'DESC');
 
-            return view('librarian/members/index', [
-                'q'       => $q,
-                'members' => $this->emptyPager(),
-                'flash'   => ['type' => 'error', 'msg' => $msg],
-            ]);
-        }
+        // ✅ total (clone biar query limit ga ikut)
+        $total = (clone $builder)->countAllResults(false);
 
-        $payload = $res['data'] ?? [];
-        if (!($payload['success'] ?? false)) {
-            return view('librarian/members/index', [
-                'q'       => $q,
-                'members' => $this->emptyPager(),
-                'flash'   => ['type' => 'error', 'msg' => $payload['message'] ?? 'API error'],
-            ]);
-        }
+        // paging
+        $rows = $builder->limit($perPage, $offset)->get()->getResultArray();
 
-        $p = $payload['data'] ?? [];
+        $lastPage = (int) ceil(max($total, 1) / $perPage);
+        if ($lastPage < 1) $lastPage = 1;
 
         $normalized = [
-            'items'        => $p['data'] ?? [],
-            'total'        => (int)($p['total'] ?? 0),
-            'per_page'     => (int)($p['per_page'] ?? 10),
-            'current_page' => (int)($p['current_page'] ?? 1),
-            'last_page'    => (int)($p['last_page'] ?? 1),
-            'from'         => (int)($p['from'] ?? 0),
-            'to'           => (int)($p['to'] ?? 0),
+            'items'        => $rows,
+            'total'        => (int) $total,
+            'per_page'     => $perPage,
+            'current_page' => $page,
+            'last_page'    => $lastPage,
+            'from'         => $total ? ($offset + 1) : 0,
+            'to'           => $total ? min($offset + $perPage, $total) : 0,
         ];
 
         return view('librarian/members/index', [
             'q'       => $q,
             'members' => $normalized,
+            'flash'   => [
+                'success' => session()->getFlashdata('success'),
+                'error'   => session()->getFlashdata('error'),
+                'info'    => session()->getFlashdata('info'),
+            ],
         ]);
     }
 
-    private function emptyPager(): array
-    {
-        return [
-            'items'        => [],
-            'total'        => 0,
-            'per_page'     => 10,
-            'current_page' => 1,
-            'last_page'    => 1,
-            'from'         => 0,
-            'to'           => 0,
-        ];
-    }
-
-    // ✅ satu-satunya aksi: nonaktifkan
+    // ✅ nonaktifkan member (bukan hapus row)
     public function delete($id)
     {
-        $res = $this->api->delete("/api/members/{$id}");
-        $r = $this->unwrap($res);
-
-        if (($r['status'] ?? 0) === 401) {
-            session()->remove('token');
-            return redirect()->to('/auth/login')->with('error', 'Sesi habis. Login ulang.');
+        $id = (int) $id;
+        if ($id < 1) {
+            return redirect()->to('/librarian/members')->with('error', 'ID tidak valid');
         }
 
-        if (!$r['ok'] || !$r['success']) {
-            return redirect()->to('/librarian/members')
-                ->with('error', $r['message'] ?: 'Gagal menonaktifkan member');
+        $user = $this->users->find($id);
+        if (!$user || ($user['role'] ?? '') !== 'member') {
+            return redirect()->to('/librarian/members')->with('error', 'Member tidak ditemukan');
+        }
+
+        $ok = $this->users->update($id, ['is_active' => 0]);
+
+        if (!$ok) {
+            return redirect()->to('/librarian/members')->with('error', 'Gagal menonaktifkan member');
         }
 
         return redirect()->to('/librarian/members')->with('success', 'Member dinonaktifkan');

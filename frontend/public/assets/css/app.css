@@ -5527,3 +5527,98 @@ html.modal-open .bx-toasts {
         padding-right: 0;
     }
 }
+
+/* =========================================================
+   GLOBAL MODAL SYSTEM (Overlay + Scrollable Body)
+   Dipakai oleh semua halaman
+   ========================================================= */
+
+.m-overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(15, 18, 25, .45);
+    backdrop-filter: blur(10px);
+    z-index: 9999;
+    overflow: hidden;
+}
+
+.m-overlay.active {
+    display: flex;
+}
+
+.m {
+    width: min(980px, 100%);
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 25px 80px rgba(0, 0, 0, .25);
+    max-height: calc(100vh - 48px);
+
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.m-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(0, 0, 0, .08);
+}
+
+.m-title {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.m-close {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, .08);
+    background: #fff;
+    cursor: pointer;
+}
+
+.m-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 18px 20px;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.m-foot {
+    padding: 14px 20px;
+    border-top: 1px solid rgba(0, 0, 0, .08);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.m-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 18px;
+}
+
+@media (max-width: 820px) {
+    .m-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .m {
+        border-radius: 16px;
+    }
+}
+
+/* Lock scroll background */
+html.modal-open,
+body.modal-open {
+    overflow: hidden;
+}

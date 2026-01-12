@@ -7,6 +7,7 @@ use App\Http\Requests\StoreBookRequest;
 use App\Http\Requests\UpdateBookRequest;
 use App\Models\Book;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class BookController extends Controller
 {
@@ -14,18 +15,23 @@ class BookController extends Controller
     {
         $q = trim((string) $request->query('search', ''));
 
+        $perPage = (int) $request->query('per_page', 20);
+        if ($perPage < 1) $perPage = 20;
+        if ($perPage > 50) $perPage = 50;
+
         $books = Book::query()
-            ->when($q !== '', function ($query) use ($q) {
-                $query->where(function ($qq) use ($q) {
-                    $qq->where('title', 'like', "%{$q}%")
-                        ->orWhere('author', 'like', "%{$q}%")
-                        ->orWhere('isbn', 'like', "%{$q}%")
-                        ->orWhere('publisher', 'like', "%{$q}%")
-                        ->orWhere('genre', 'like', "%{$q}%");
+            ->when($q !== '', function ($qq) use ($q) {
+                $like = '%' . addcslashes($q, '%_\\') . '%';
+                $qq->where(function ($w) use ($like) {
+                    $w->where('title', 'like', $like)
+                      ->orWhere('author', 'like', $like)
+                      ->orWhere('isbn', 'like', $like)
+                      ->orWhere('publisher', 'like', $like)
+                      ->orWhere('genre', 'like', $like);
                 });
             })
             ->orderByDesc('id')
-            ->paginate(10);
+            ->paginate($perPage);
 
         return response()->json([
             'success' => true,
@@ -34,51 +40,8 @@ class BookController extends Controller
         ]);
     }
 
-    public function store(StoreBookRequest $request)
+    public function show(Book $book)
     {
-        $total = (int) $request->input('stock_total', 0);
-
-        /**
-         * ✅ kalau user isi stock_available, pakai itu
-         * kalau tidak dikirim, default = total (biar masih masuk akal)
-         */
-        $avail = $request->has('stock_available')
-            ? (int) $request->input('stock_available', 0)
-            : $total;
-
-        // ✅ hard guard (double safety, walau seharusnya juga divalidasi di FormRequest)
-        if ($avail > $total) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors'  => [
-                    'stock_available' => ['Stock Available tidak boleh lebih besar dari Stock Total.'],
-                ],
-            ], 422);
-        }
-
-        $book = Book::create([
-            'isbn'            => $request->input('isbn'),
-            'title'           => $request->input('title'),
-            'author'          => $request->input('author'),
-            'publisher'       => $request->input('publisher'),
-            'genre'           => $request->input('genre'),
-            'year'            => $request->input('year'),
-            'stock_total'     => $total,
-            'stock_available' => $avail,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Created',
-            'data'    => $book,
-        ], 201);
-    }
-
-    public function show(string $id)
-    {
-        $book = Book::findOrFail($id);
-
         return response()->json([
             'success' => true,
             'message' => 'OK',
@@ -86,63 +49,82 @@ class BookController extends Controller
         ]);
     }
 
-    public function update(UpdateBookRequest $request, string $id)
+    public function store(StoreBookRequest $request)
     {
-        $book = Book::findOrFail($id);
+        $payload = $request->validated();
 
-        // total wajib ada di request (sesuai form kamu)
-        $total = (int) $request->input('stock_total', (int) $book->stock_total);
-
-        /**
-         * ✅ pakai stock_available dari request kalau ada,
-         * kalau tidak ada, pertahankan existing (bukan delta)
-         */
-        $avail = $request->has('stock_available')
-            ? (int) $request->input('stock_available', (int) $book->stock_available)
-            : (int) $book->stock_available;
-
-        // clamp basic
-        if ($total < 0) $total = 0;
-        if ($avail < 0) $avail = 0;
-
-        // ✅ rule utama
-        if ($avail > $total) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors'  => [
-                    'stock_available' => ['Stock Available tidak boleh lebih besar dari Stock Total.'],
-                ],
-            ], 422);
+        $coverPath = null;
+        if ($request->hasFile('cover')) {
+            $coverPath = $request->file('cover')->store('books', 'public');
         }
 
-        $book->update([
-            'isbn'            => $request->input('isbn'),
-            'title'           => $request->input('title'),
-            'author'          => $request->input('author'),
-            'publisher'       => $request->input('publisher'),
-            'genre'           => $request->input('genre'),
-            'year'            => $request->input('year'),
-            'stock_total'     => $total,
-            'stock_available' => $avail,
+        $book = Book::create([
+            'isbn'            => $payload['isbn'] ?? null,
+            'title'           => $payload['title'],
+            'author'          => $payload['author'],
+            'publisher'       => $payload['publisher'] ?? null,
+            'genre'           => $payload['genre'],
+            'year'            => $payload['year'] ?? null,
+            'stock_total'     => (int) $payload['stock_total'],
+            'stock_available' => (int) ($payload['stock_available'] ?? $payload['stock_total']),
+            'cover'           => $coverPath,
         ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Updated',
-            'data'    => $book->fresh(),
+            'message' => 'Book created',
+            'data'    => $book,
+        ], 201);
+    }
+
+    public function update(UpdateBookRequest $request, Book $book)
+    {
+        $payload = $request->validated();
+
+        // optional: hapus cover tanpa upload baru
+        if (!empty($payload['remove_cover']) && $book->cover) {
+            Storage::disk('public')->delete($book->cover);
+            $book->cover = null;
+        }
+
+        // upload cover baru
+        if ($request->hasFile('cover')) {
+            // delete cover lama
+            if ($book->cover) {
+                Storage::disk('public')->delete($book->cover);
+            }
+            $book->cover = $request->file('cover')->store('books', 'public');
+        }
+
+        $book->isbn            = $payload['isbn'] ?? null;
+        $book->title           = $payload['title'];
+        $book->author          = $payload['author'];
+        $book->publisher       = $payload['publisher'] ?? null;
+        $book->genre           = $payload['genre'];
+        $book->year            = $payload['year'] ?? null;
+        $book->stock_total     = (int) $payload['stock_total'];
+        $book->stock_available = (int) ($payload['stock_available'] ?? $payload['stock_total']);
+
+        $book->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Book updated',
+            'data'    => $book,
         ]);
     }
 
-    public function destroy(string $id)
+    public function destroy(Book $book)
     {
-        $book = Book::findOrFail($id);
+        if ($book->cover) {
+            Storage::disk('public')->delete($book->cover);
+        }
+
         $book->delete();
 
         return response()->json([
             'success' => true,
-            'message' => 'Deleted',
-            'data'    => (object) [],
+            'message' => 'Book deleted',
         ]);
     }
 }

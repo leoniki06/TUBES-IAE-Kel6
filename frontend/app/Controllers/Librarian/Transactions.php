@@ -3,193 +3,190 @@
 namespace App\Controllers\Librarian;
 
 use App\Controllers\BaseController;
+use App\Models\TransactionModel;
 
 class Transactions extends BaseController
 {
     private const FINE_OVERDUE = 10000;
 
+    private TransactionModel $tx;
+
+    public function __construct()
+    {
+        $this->tx = new TransactionModel();
+    }
+
     public function index()
     {
         $q      = trim((string) $this->request->getGet('search'));
-        $status = trim((string) $this->request->getGet('status')); // borrowed|returned|overdue|''
+        $status = trim((string) $this->request->getGet('status')); // borrowed|returned|overdue|'' (optional)
         $from   = trim((string) $this->request->getGet('from'));   // YYYY-MM-DD
         $to     = trim((string) $this->request->getGet('to'));     // YYYY-MM-DD
 
-        // ✅ kamu maunya: dummy hanya aktif kalau ada ?dummy1
-        $dummy = $this->request->getGet('dummy1') !== null ? 1 : 0;
+        $page = (int) ($this->request->getGet('page') ?? 1);
+        if ($page < 1) $page = 1;
+
+        $perPage = 10;
+        $offset  = ($page - 1) * $perPage;
+
+        $db = db_connect();
+
+        // Base query
+        $builder = $db->table('transactions t')
+            ->select([
+                't.*',
+                'u.name as member_name',
+                'u.email as member_email',
+                // kalau books ada:
+                'b.title as book_title',
+            ])
+            ->join('users u', 'u.id = t.user_id', 'left');
+
+        // join books aman: kalau tabel books tidak ada, comment 1 baris ini
+        $builder->join('books b', 'b.id = t.book_id', 'left');
 
         // =========================
-        // 1) SOURCE DATA
+        // Filters
         // =========================
-        // Default HARUS kosong sampai user input data beneran
-        if ($dummy === 1) {
-            $rows = $this->dummyTransactions(); // baca session kalau ada
-        } else {
-            $rows = []; // ✅ default kosong
+        if ($q !== '') {
+            $builder->groupStart()
+                ->like('u.name', $q)
+                ->orLike('u.email', $q)
+                ->orLike('b.title', $q)
+                ->orLike('t.id', $q)
+                ->groupEnd();
         }
 
+        // date range based on borrow_date
+        if ($from !== '') {
+            $builder->where('t.borrow_date >=', $from . ' 00:00:00');
+        }
+        if ($to !== '') {
+            $builder->where('t.borrow_date <=', $to . ' 23:59:59');
+        }
+
+        // status:
+        // - kalau status DB kamu sudah "returned"/"borrowed", pakai langsung
+        // - kalau kamu mau "overdue" dihitung otomatis, kita handle setelah fetch
+        if ($status !== '' && $status !== 'overdue') {
+            $builder->where('t.status', $status);
+        }
+
+        // total
+        $total = (clone $builder)->countAllResults(false);
+
+        // fetch paged
+        $rows = $builder
+            ->orderBy('t.borrow_date', 'DESC')
+            ->limit($perPage, $offset)
+            ->get()
+            ->getResultArray();
+
         // =========================
-        // 2) NORMALIZE + AUTO STATUS + FINE
+        // Normalize + auto overdue
         // =========================
         $now = time();
-
         $items = [];
-        foreach ($rows as $row) {
-            $row = $this->normalizeRow($row);
 
-            $borrowedAt = $row['borrowed_at'] ? strtotime($row['borrowed_at']) : null;
-            $dueAt      = $row['due_at'] ? strtotime($row['due_at']) : null;
-            $returnedAt = $row['returned_at'] ? strtotime($row['returned_at']) : null;
+        foreach ($rows as $r) {
+            $borrowedAt = !empty($r['borrow_date']) ? strtotime($r['borrow_date']) : null;
+            $dueAt      = !empty($r['due_date']) ? strtotime($r['due_date']) : null;
+            $returnedAt = !empty($r['return_date']) ? strtotime($r['return_date']) : null;
 
-            // Auto status:
+            // status normalize
+            $calcStatus = $r['status'] ?? '';
             if ($returnedAt) {
-                $row['status'] = 'returned';
+                $calcStatus = 'returned';
             } elseif ($dueAt && $now > $dueAt) {
-                $row['status'] = 'overdue';
+                $calcStatus = 'overdue';
             } else {
-                $row['status'] = 'borrowed';
+                // default borrowed kalau belum return
+                $calcStatus = $calcStatus !== '' ? $calcStatus : 'borrowed';
             }
 
-            // Fine:
-            $row['fine'] = ($row['status'] === 'overdue') ? self::FINE_OVERDUE : 0;
-
-            // =========================
-            // 3) FILTERS
-            // =========================
-            if ($q !== '') {
-                $hay = strtolower(
-                    ($row['id'] ?? '') . ' ' .
-                        ($row['member']['name'] ?? '') . ' ' .
-                        ($row['member']['email'] ?? '') . ' ' .
-                        ($row['book']['title'] ?? '')
-                );
-                if (strpos($hay, strtolower($q)) === false) continue;
+            // kalau user filter overdue, buang yang bukan overdue
+            if ($status === 'overdue' && $calcStatus !== 'overdue') {
+                continue;
             }
 
-            if ($status !== '' && strtolower($row['status']) !== strtolower($status)) continue;
+            $items[] = [
+                'id'          => (int) ($r['id'] ?? 0),
+                'status'      => $calcStatus,
+                'fine'        => ($calcStatus === 'overdue') ? self::FINE_OVERDUE : (int)($r['fine_amount'] ?? 0),
 
-            // date range based on borrowed_at
-            if ($from !== '' && $borrowedAt) {
-                $fromTs = strtotime($from . ' 00:00:00');
-                if ($borrowedAt < $fromTs) continue;
-            }
-            if ($to !== '' && $borrowedAt) {
-                $toTs = strtotime($to . ' 23:59:59');
-                if ($borrowedAt > $toTs) continue;
-            }
+                'borrowed_at' => $r['borrow_date'] ?? null,
+                'due_at'      => $r['due_date'] ?? null,
+                'returned_at' => $r['return_date'] ?? null,
 
-            $items[] = $row;
+                'member' => [
+                    'name'  => $r['member_name'] ?? '-',
+                    'email' => $r['member_email'] ?? '',
+                ],
+                'book' => [
+                    'title' => $r['book_title'] ?? '-',
+                ],
+            ];
         }
 
-        // sort newest first by borrowed_at
-        usort($items, function ($a, $b) {
-            $ta = $a['borrowed_at'] ? strtotime($a['borrowed_at']) : 0;
-            $tb = $b['borrowed_at'] ? strtotime($b['borrowed_at']) : 0;
-            return $tb <=> $ta;
-        });
+        $lastPage = (int) ceil(max($total, 1) / $perPage);
+        if ($lastPage < 1) $lastPage = 1;
 
-        $data = [
+        return view('librarian/Transactions/index', [
             'items' => $items,
             'filters' => [
                 'search' => $q,
                 'status' => $status,
                 'from'   => $from,
                 'to'     => $to,
-                'dummy'  => $dummy, // ✅ supaya view bisa persist dummy1 di form
+            ],
+            'pager' => [
+                'total'        => (int) $total,
+                'per_page'     => $perPage,
+                'current_page' => $page,
+                'last_page'    => $lastPage,
+                'from'         => $total ? ($offset + 1) : 0,
+                'to'           => $total ? min($offset + $perPage, $total) : 0,
             ],
             'flash' => [
                 'success' => session()->getFlashdata('success'),
                 'error'   => session()->getFlashdata('error'),
                 'info'    => session()->getFlashdata('info'),
             ],
-        ];
-
-        return view('librarian/Transactions/index', $data);
+        ]);
     }
 
-    // ✅ ROUTE: POST /librarian/transactions/(:num)/return
+    // ✅ POST /librarian/transactions/{id}/return
     public function markReturned(int $id)
     {
-        // ✅ baca dummy dari ?dummy1 (bukan ?dummy=1)
-        $dummy = $this->request->getGet('dummy1') !== null ? 1 : 0;
-
-        if ($dummy === 1) {
-            $list = session()->get('tx_dummy') ?? $this->dummyTransactions();
-            $now  = date('Y-m-d H:i:s');
-
-            foreach ($list as &$row) {
-                if ((int)($row['id'] ?? 0) === $id) {
-                    $row['returned_at'] = $now;
-                    break;
-                }
-            }
-            unset($row);
-
-            session()->set('tx_dummy', $list);
-
-            session()->setFlashdata('success', "Transaction #{$id} berhasil ditandai Returned.");
-            return redirect()->to(site_url('librarian/transactions?dummy1'));
+        $id = (int) $id;
+        if ($id < 1) {
+            return redirect()->to(site_url('librarian/transactions'))->with('error', 'ID transaksi tidak valid');
         }
 
-        // Real mode: nanti ganti dengan API update returned_at
-        session()->setFlashdata('success', "Transaction #{$id} berhasil ditandai Returned.");
-        return redirect()->to(site_url('librarian/transactions'));
-    }
+        $row = $this->tx->find($id);
+        if (!$row) {
+            return redirect()->to(site_url('librarian/transactions'))->with('error', 'Transaksi tidak ditemukan');
+        }
 
-    // -------------------------
-    // Helpers
-    // -------------------------
-    private function normalizeRow(array $row): array
-    {
-        $row['id'] = (int)($row['id'] ?? 0);
+        $now = date('Y-m-d H:i:s');
 
-        $row['member'] = $row['member'] ?? [
-            'name'  => $row['member_name'] ?? '-',
-            'email' => $row['member_email'] ?? '',
-        ];
+        // hitung overdue fine (opsional)
+        $dueAt = !empty($row['due_date']) ? strtotime($row['due_date']) : null;
+        $fine  = 0;
+        if ($dueAt && time() > $dueAt) {
+            $fine = self::FINE_OVERDUE;
+        }
 
-        $row['book'] = $row['book'] ?? [
-            'title' => $row['book_title'] ?? '-',
-        ];
+        $ok = $this->tx->update($id, [
+            'return_date' => $now,
+            'status'      => 'returned',
+            'fine_amount' => $fine,
+        ]);
 
-        $row['borrowed_at'] = $row['borrowed_at'] ?? $row['created_at'] ?? null;
-        $row['due_at']      = $row['due_at'] ?? null;
-        $row['returned_at'] = $row['returned_at'] ?? null;
+        if (!$ok) {
+            return redirect()->to(site_url('librarian/transactions'))->with('error', "Gagal update transaksi #{$id}");
+        }
 
-        return $row;
-    }
-
-    private function dummyTransactions(): array
-    {
-        // ✅ session dipakai agar status terasa berubah setelah confirm
-        $saved = session()->get('tx_dummy');
-        if (is_array($saved) && !empty($saved)) return $saved;
-
-        return [
-            [
-                'id' => 101,
-                'member' => ['name' => 'Natan', 'email' => 'natan@mail.com'],
-                'book' => ['title' => 'Atomic Habits'],
-                'borrowed_at' => '2026-01-03 10:12:00',
-                'due_at' => '2026-01-10 00:00:00',
-                'returned_at' => null,
-            ],
-            [
-                'id' => 102,
-                'member' => ['name' => 'Alya', 'email' => 'alya@mail.com'],
-                'book' => ['title' => "Don't Make Me Think"],
-                'borrowed_at' => '2025-12-28 08:40:00',
-                'due_at' => '2026-01-03 00:00:00',
-                'returned_at' => '2026-01-03 15:20:00',
-            ],
-            [
-                'id' => 103,
-                'member' => ['name' => 'Raka', 'email' => 'raka@mail.com'],
-                'book' => ['title' => 'The Power of Habit'],
-                'borrowed_at' => '2025-12-20 09:15:00',
-                'due_at' => '2025-12-27 00:00:00',
-                'returned_at' => null,
-            ],
-        ];
+        return redirect()->to(site_url('librarian/transactions'))->with('success', "Transaksi #{$id} berhasil ditandai Returned.");
     }
 }

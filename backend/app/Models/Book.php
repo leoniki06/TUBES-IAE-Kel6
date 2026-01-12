@@ -14,10 +14,11 @@ class Book extends Model
         'title',
         'author',
         'publisher',
-        'genre',          // ✅ PENTING
+        'genre',
         'year',
         'stock_total',
         'stock_available',
+        'cover', // ✅ tambah
     ];
 
     protected $casts = [
@@ -25,4 +26,13 @@ class Book extends Model
         'stock_total'     => 'integer',
         'stock_available' => 'integer',
     ];
+
+    // Optional helper: URL cover siap pakai
+    protected $appends = ['cover_url'];
+
+    public function getCoverUrlAttribute(): ?string
+    {
+        if (!$this->cover) return null;
+        return asset('storage/' . ltrim($this->cover, '/'));
+    }
 }
