@@ -15,11 +15,7 @@ use CodeIgniter\Filters\SecureHeaders;
 
 class Filters extends BaseFilters
 {
-    /**
-     * Filter Aliases
-     */
     public array $aliases = [
-        // bawaan CI
         'csrf'          => CSRF::class,
         'toolbar'       => DebugToolbar::class,
         'honeypot'      => Honeypot::class,
@@ -30,47 +26,30 @@ class Filters extends BaseFilters
         'pagecache'     => PageCache::class,
         'performance'   => PerformanceMetrics::class,
 
-        // custom filters (PENTING)
         'auth'  => \App\Filters\AuthFilter::class,
         'role'  => \App\Filters\RoleFilter::class,
         'admin' => \App\Filters\AdminFilter::class,
     ];
 
-    /**
-     * Special required filters
-     */
+    // ✅ Jangan pakai forcehttps/pagecache di required.
     public array $required = [
+        'before' => [],
+        'after'  => [],
+    ];
+
+    // ✅ Kalau mau forcehttps, pasang hanya di production (opsional).
+    public array $globals = [
         'before' => [
-            'forcehttps',
-            'pagecache',
+            // 'forcehttps', // aktifkan hanya kalau server benar-benar https
+            // 'csrf',
         ],
         'after' => [
-            'pagecache',
+            // 'secureheaders',
             'performance',
             'toolbar',
         ],
     ];
 
-    /**
-     * Global filters
-     */
-    public array $globals = [
-        'before' => [
-            // 'honeypot',
-            // 'csrf',
-        ],
-        'after' => [
-            // 'secureheaders',
-        ],
-    ];
-
-    /**
-     * Method-based filters
-     */
     public array $methods = [];
-
-    /**
-     * Pattern-based filters
-     */
     public array $filters = [];
 }

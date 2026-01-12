@@ -12,192 +12,232 @@ class Books extends BaseController
     public function __construct()
     {
         $this->api = new ApiClient();
-        helper(['form', 'url']);
     }
 
     public function index()
     {
-        if (!session('token')) {
-            return redirect()->to('/auth/login')->with('error', 'Silakan login dulu');
-        }
-
         $search = trim((string) $this->request->getGet('search'));
         $page   = (int) ($this->request->getGet('page') ?? 1);
         if ($page < 1) $page = 1;
 
         $res = $this->api->get('/api/books', [
             'query' => array_filter([
-                'search' => $search !== '' ? $search : null,
-                'page'   => $page,
-            ], fn($v) => $v !== null),
+                'search'   => $search !== '' ? $search : null,
+                'page'     => $page,
+                'per_page' => 10,
+            ])
         ]);
 
-        if (!$res['ok'] && (int) ($res['status'] ?? 0) === 401) {
-            session()->remove(['token', 'user']);
-            return redirect()->to('/auth/login')->with('error', 'Sesi habis. Silakan login lagi.');
+        if (!($res['ok'] ?? false) || !is_array($res['data'] ?? null)) {
+            return view('librarian/books/index', [
+                'books' => [],
+                'meta'  => ['current_page' => 1, 'last_page' => 1, 'total' => 0],
+                'search'=> $search,
+                'error' => 'Gagal akses API books. HTTP ' . ($res['status'] ?? 0),
+            ]);
         }
 
-        $payload = $res['data']['data'] ?? [];
-        $books   = $payload['data'] ?? [];
-        $meta    = $payload ?: [
-            'current_page' => 1,
-            'last_page'    => 1,
-            'total'        => count($books),
+        $payload = $res['data'] ?? [];
+        $data    = $payload['data'] ?? [];
+
+        $books = $data['data'] ?? [];
+        $meta  = [
+            'current_page' => (int) ($data['current_page'] ?? 1),
+            'last_page'    => (int) ($data['last_page'] ?? 1),
+            'total'        => (int) ($data['total'] ?? count($books)),
         ];
 
         return view('librarian/books/index', [
             'books'      => $books,
             'meta'       => $meta,
+            'totalItems' => $meta['total'],
             'search'     => $search,
-            'totalItems' => (int)($meta['total'] ?? count($books)),
         ]);
     }
 
+    /**
+     * ==========================
+     * CREATE (POST)
+     * ==========================
+     */
     public function store()
     {
-        if (!session('token')) {
-            return redirect()->to('/auth/login')->with('error', 'Silakan login dulu');
+        [$fields, $file, $hasCover] = $this->collectFieldsAndCover();
+
+        // tanpa cover => form_params (lebih stabil)
+        if (!$hasCover) {
+            $res = $this->api->post('/api/books', [
+                'form_params' => $fields,
+            ]);
+            return $this->handleWriteResult($res, '/librarian/books', 'Buku berhasil ditambahkan.', true);
         }
 
-        $data = $this->request->getPost([
-            'isbn',
-            'title',
-            'author',
-            'publisher',
-            'genre',
-            'year',
-            'stock_total',
-            'stock_available',
+        // dengan cover => multipart
+        $multipart = $this->toMultipart($fields, $file);
+        $res = $this->api->post('/api/books', [
+            'multipart' => $multipart,
         ]);
 
-        $rules = [
-            'isbn'            => 'required|min_length[3]',
-            'title'           => 'required|min_length[2]',
-            'author'          => 'required|min_length[2]',
-            'genre'           => 'required|min_length[2]',
-            'year'            => 'permit_empty|integer',
-            'stock_total'     => 'required|integer|greater_than_equal_to[0]',
-            'stock_available' => 'required|integer|greater_than_equal_to[0]',
-        ];
-
-        if (!$this->validate($rules)) {
-            return redirect()->back()
-                ->withInput()
-                ->with('errors', $this->validator->getErrors());
-        }
-
-        $total = (int) ($data['stock_total'] ?? 0);
-        $avail = (int) ($data['stock_available'] ?? 0);
-
-        // ✅ aturan yang kamu mau
-        if ($avail > $total) {
-            return redirect()->back()
-                ->withInput()
-                ->with('errors', ['stock_available' => 'Stock Available tidak boleh lebih besar dari Stock Total.']);
-        }
-
-        $payload = [
-            'isbn'            => (string) $data['isbn'],
-            'title'           => (string) $data['title'],
-            'author'          => (string) $data['author'],
-            'publisher'       => (string) ($data['publisher'] ?? ''),
-            'genre'           => (string) ($data['genre'] ?? ''),
-            'year'            => (int) ($data['year'] ?: 0),
-            'stock_total'     => $total,
-            'stock_available' => $avail,
-        ];
-
-        $res = $this->api->post('/api/books', ['form_params' => $payload]);
-
-        if (!$res['ok']) {
-            $msg = $res['data']['message'] ?? 'Gagal tambah book (API error).';
-            return redirect()->back()->withInput()->with('error', $msg);
-        }
-
-        return redirect()->to(base_url('librarian/books'))->with('success', 'Book berhasil ditambahkan.');
+        return $this->handleWriteResult($res, '/librarian/books', 'Buku berhasil ditambahkan.', true);
     }
 
+    /**
+     * ==========================
+     * UPDATE (PUT)
+     * ==========================
+     */
     public function update($id)
     {
-        if (!session('token')) {
-            return redirect()->to('/auth/login')->with('error', 'Silakan login dulu');
+        [$fields, $file, $hasCover] = $this->collectFieldsAndCover();
+
+        // remove cover checkbox
+        if (!empty($this->request->getPost('remove_cover'))) {
+            $fields['remove_cover'] = '1';
         }
 
-        $id = (int) $id;
+        // tanpa cover => form_params (PUT + urlencoded via ApiClient fix)
+        if (!$hasCover) {
+            $res = $this->api->put("/api/books/{$id}", [
+                'form_params' => $fields,
+            ]);
+            return $this->handleWriteResult($res, '/librarian/books', 'Buku berhasil diupdate.', false);
+        }
 
-        $data = $this->request->getPost([
-            'isbn',
-            'title',
-            'author',
-            'publisher',
-            'genre',
-            'year',
-            'stock_total',
-            'stock_available',
+        // dengan cover => multipart
+        $multipart = $this->toMultipart($fields, $file);
+        $res = $this->api->put("/api/books/{$id}", [
+            'multipart' => $multipart,
         ]);
 
-        $rules = [
-            'isbn'            => 'required|min_length[3]',
-            'title'           => 'required|min_length[2]',
-            'author'          => 'required|min_length[2]',
-            'genre'           => 'required|min_length[2]',
-            'year'            => 'permit_empty|integer',
-            'stock_total'     => 'required|integer|greater_than_equal_to[0]',
-            'stock_available' => 'required|integer|greater_than_equal_to[0]',
-        ];
-
-        if (!$this->validate($rules)) {
-            return redirect()->back()
-                ->withInput()
-                ->with('errors', $this->validator->getErrors());
-        }
-
-        $total = (int) ($data['stock_total'] ?? 0);
-        $avail = (int) ($data['stock_available'] ?? 0);
-
-        // ✅ FIX: sebelumnya belum ada check ini di update (ini yang bikin kamu bingung)
-        if ($avail > $total) {
-            return redirect()->back()
-                ->withInput()
-                ->with('errors', ['stock_available' => 'Stock Available tidak boleh lebih besar dari Stock Total.']);
-        }
-
-        $payload = [
-            'isbn'            => (string) $data['isbn'],
-            'title'           => (string) $data['title'],
-            'author'          => (string) $data['author'],
-            'publisher'       => (string) ($data['publisher'] ?? ''),
-            'genre'           => (string) ($data['genre'] ?? ''),
-            'year'            => (int) ($data['year'] ?: 0),
-            'stock_total'     => $total,
-            'stock_available' => $avail,
-        ];
-
-        $res = $this->api->put("/api/books/{$id}", ['form_params' => $payload]);
-
-        if (!$res['ok']) {
-            $msg = $res['data']['message'] ?? 'Gagal update book (API error).';
-            return redirect()->back()->withInput()->with('error', $msg);
-        }
-
-        return redirect()->to(base_url('librarian/books'))->with('success', 'Book berhasil diupdate.');
+        return $this->handleWriteResult($res, '/librarian/books', 'Buku berhasil diupdate.', false);
     }
 
+    /**
+     * ==========================
+     * DELETE
+     * ==========================
+     */
     public function delete($id)
     {
-        if (!session('token')) {
-            return redirect()->to('/auth/login')->with('error', 'Silakan login dulu');
-        }
-
-        $id = (int) $id;
-
         $res = $this->api->delete("/api/books/{$id}");
+        return $this->handleWriteResult($res, '/librarian/books', 'Buku berhasil dihapus.', false);
+    }
 
-        if (!$res['ok']) {
-            $msg = $res['data']['message'] ?? 'Gagal hapus book (API error).';
-            return redirect()->back()->with('error', $msg);
+    /**
+     * ==========================
+     * HELPERS
+     * ==========================
+     */
+
+    /**
+     * Ambil semua field dari form + file cover (kalau ada)
+     */
+    private function collectFieldsAndCover(): array
+    {
+        $fields = [
+            'isbn'            => trim((string)$this->request->getPost('isbn')),
+            'title'           => trim((string)$this->request->getPost('title')),
+            'author'          => trim((string)$this->request->getPost('author')),
+            'publisher'       => trim((string)$this->request->getPost('publisher')),
+            'genre'           => trim((string)$this->request->getPost('genre')),
+            'year'            => trim((string)$this->request->getPost('year')),
+            'stock_total'     => trim((string)$this->request->getPost('stock_total')),
+            'stock_available' => trim((string)$this->request->getPost('stock_available')),
+        ];
+
+        $file = $this->request->getFile('cover');
+        $hasCover = ($file && $file->isValid() && !$file->hasMoved());
+
+        return [$fields, $file, $hasCover];
+    }
+
+    /**
+     * Convert associative array fields + file menjadi multipart array
+     */
+    private function toMultipart(array $fields, $file): array
+    {
+        $multipart = [];
+        foreach ($fields as $k => $v) {
+            $multipart[] = ['name' => $k, 'contents' => $v];
         }
 
-        return redirect()->to(base_url('librarian/books'))->with('success', 'Book berhasil dihapus.');
+        if ($file && $file->isValid() && !$file->hasMoved()) {
+            $multipart[] = [
+                'name'     => 'cover',
+                'contents' => fopen($file->getTempName(), 'r'),
+                'filename' => $file->getName(),
+            ];
+        }
+
+        return $multipart;
+    }
+
+    /**
+     * Flatten errors dari Laravel (422)
+     */
+    private function flattenLaravelErrors(array $payload): array
+    {
+        $out = [];
+
+        if (isset($payload['errors']) && is_array($payload['errors'])) {
+            foreach ($payload['errors'] as $field => $msgs) {
+                if (is_array($msgs)) {
+                    foreach ($msgs as $m) $out[] = (string)$m;
+                } else {
+                    $out[] = (string)$msgs;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Handler universal untuk store/update/delete
+     *
+     * $openAddModalOnError:
+     * - true untuk store => supaya modal add kebuka lagi saat error
+     * - false untuk update/delete
+     */
+    private function handleWriteResult(array $res, string $redirectTo, string $successMsg, bool $openAddModalOnError)
+    {
+        $payload = $res['data'] ?? [];
+
+        // gagal HTTP (termasuk 422)
+        if (!($res['ok'] ?? false)) {
+            $errors = $this->flattenLaravelErrors($payload);
+
+            $redir = redirect()->to($redirectTo)
+                ->with('error', $payload['message'] ?? 'Validation error')
+                ->withInput();
+
+            if (!empty($errors)) $redir = $redir->with('errors', $errors);
+
+            // trigger modal add kebuka lagi
+            if ($openAddModalOnError) {
+                $redir = $redir->with('open_add_modal', true);
+            }
+
+            return $redir;
+        }
+
+        // ok tapi success false (kalau backend kamu pakai flag)
+        if (isset($payload['success']) && $payload['success'] === false) {
+            $errors = $this->flattenLaravelErrors($payload);
+
+            $redir = redirect()->to($redirectTo)
+                ->with('error', $payload['message'] ?? 'Gagal memproses data.')
+                ->withInput();
+
+            if (!empty($errors)) $redir = $redir->with('errors', $errors);
+
+            if ($openAddModalOnError) {
+                $redir = $redir->with('open_add_modal', true);
+            }
+
+            return $redir;
+        }
+
+        return redirect()->to($redirectTo)->with('success', $successMsg);
     }
 }

@@ -13,7 +13,7 @@ class ApiClient
         // Ambil dari ENV CI4 (file .env CI4)
         $env = (string) env('BACKEND_API_BASEURL');
 
-        // Trim spasi & petik (kalau user nulis '...' atau "...")
+        // Trim spasi & petik
         $env = trim($env);
         $env = trim($env, "\"'");
 
@@ -74,8 +74,6 @@ class ApiClient
 
     private function normalizePath(string $path): string
     {
-        // kita pakai baseURI, jadi di request gunakan path relatif (tanpa host)
-        // tetap izinkan user ngirim "/api/auth/login" atau "api/auth/login"
         $path = '/' . ltrim($path, '/');
 
         // Anti dobel /api/api kalau ada yang salah kirim path
@@ -94,14 +92,52 @@ class ApiClient
             'baseURI'     => $this->baseUrl,
             'timeout'     => 25,
             'http_errors' => false,
-            'verify'      => false, // dev only; kalau https production, ubah true
+            'verify'      => false,
         ]);
 
+        // headers default + auth token
         $options['headers'] = $this->buildHeaders($options['headers'] ?? []);
 
-        $isSendingJsonBody = array_key_exists('json', $options) && is_array($options['json']);
-        if ($isSendingJsonBody) {
+        // Deteksi tipe body
+        $isJson      = array_key_exists('json', $options) && is_array($options['json']);
+        $isMultipart = array_key_exists('multipart', $options) && is_array($options['multipart']);
+        $isForm      = array_key_exists('form_params', $options) && is_array($options['form_params']);
+
+        /**
+         * =========================
+         * PENTING:
+         * - Jangan set Content-Type manual kalau multipart (biar boundary benar)
+         * - PUT/PATCH/DELETE + form_params sering tidak terkirim di CI4 curlrequest.
+         *   Solusinya: ubah jadi body urlencoded + header x-www-form-urlencoded.
+         * =========================
+         */
+
+        // Multipart: pastikan Content-Type tidak dipaksa
+        if ($isMultipart) {
+            unset($options['headers']['Content-Type']);
+        }
+
+        // JSON: boleh set Content-Type json (kalau bukan multipart)
+        if ($isJson && !$isMultipart) {
             $options['headers']['Content-Type'] = 'application/json';
+        }
+
+        // form_params:
+        if ($isForm && !$isMultipart && !$isJson) {
+            // untuk POST biasanya aman pakai form_params
+            // tapi untuk PUT/PATCH/DELETE lebih aman pakai body urlencoded
+            $upper = strtoupper($method);
+            if (in_array($upper, ['PUT', 'PATCH', 'DELETE'], true)) {
+                $options['body'] = http_build_query($options['form_params']);
+                unset($options['form_params']);
+                $options['headers']['Content-Type'] = 'application/x-www-form-urlencoded';
+            } else {
+                // POST/GET: biarkan form_params
+                // header biar server ngerti (opsional)
+                if (!isset($options['headers']['Content-Type'])) {
+                    $options['headers']['Content-Type'] = 'application/x-www-form-urlencoded';
+                }
+            }
         }
 
         try {
@@ -109,7 +145,6 @@ class ApiClient
             $status = (int) $resp->getStatusCode();
             $raw    = (string) $resp->getBody();
 
-            // decode JSON kalau bisa
             $data = null;
             if ($raw !== '') {
                 $decoded = json_decode($raw, true);
@@ -125,7 +160,7 @@ class ApiClient
                 'raw'    => $raw,
                 'error'  => null,
                 'url'    => rtrim($this->baseUrl, '/') . $path,
-                'method' => $method,
+                'method' => strtoupper($method),
             ];
         } catch (\Throwable $e) {
             return [
@@ -135,7 +170,7 @@ class ApiClient
                 'raw'    => null,
                 'error'  => $e->getMessage(),
                 'url'    => rtrim($this->baseUrl, '/') . $path,
-                'method' => $method,
+                'method' => strtoupper($method),
             ];
         }
     }

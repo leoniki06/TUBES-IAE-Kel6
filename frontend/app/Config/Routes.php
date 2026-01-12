@@ -5,8 +5,14 @@ namespace Config;
 use CodeIgniter\Router\RouteCollection;
 use Config\Services;
 
+/**
+ * @var RouteCollection $routes
+ */
 $routes = Services::routes();
 
+// --------------------------------------------------------------------
+// Router Setup
+// --------------------------------------------------------------------
 $routes->setDefaultNamespace('App\Controllers');
 $routes->setDefaultController('Home');
 $routes->setDefaultMethod('index');
@@ -14,53 +20,67 @@ $routes->setTranslateURIDashes(false);
 $routes->set404Override();
 $routes->setAutoRoute(false);
 
+// --------------------------------------------------------------------
 // Public & Auth
+// --------------------------------------------------------------------
 $routes->get('/', 'Auth::splash');
 $routes->get('logout', 'Auth::logout');
 
-// Auth Test Routes (Untuk keperluan testing saja)
+// Auth Test Routes (testing only)
 $routes->get('test-login', 'AuthTest::loginDummy');
 $routes->get('test-logout', 'AuthTest::logoutDummy');
-
 
 $routes->group('auth', static function ($routes) {
     $routes->get('login', 'Auth::login');
     $routes->get('register', 'Auth::register');
+
     $routes->post('login', 'Auth::doLogin');
     $routes->post('register', 'Auth::doRegister');
+
     $routes->get('logout', 'Auth::logout');
 });
 
-// Librarian Routes (Tetap diproteksi)
+// --------------------------------------------------------------------
+// Librarian Routes (PROTECTED)
+// --------------------------------------------------------------------
 $routes->group('librarian', ['filter' => 'auth'], static function ($routes) {
+
+    // Dashboard
     $routes->get('dashboard', 'Librarian\Dashboard::index', ['filter' => 'role:librarian']);
-    $routes->group('books', ['filter' => 'role:librarian'], static function ($routes) {
-        $routes->get('/', 'Librarian\Books::index');
-        $routes->post('/', 'Librarian\Books::store');
-        $routes->post('(:num)/update', 'Librarian\Books::update/$1');
-        $routes->post('(:num)/delete', 'Librarian\Books::delete/$1');
-    });
+
+    // Books
+    $routes->get('books', 'Librarian\Books::index', ['filter' => 'role:librarian']);
+    $routes->post('books', 'Librarian\Books::store', ['filter' => 'role:librarian']);
+    $routes->post('books/(:num)/update', 'Librarian\Books::update/$1', ['filter' => 'role:librarian']);
+    $routes->post('books/(:num)/delete', 'Librarian\Books::delete/$1', ['filter' => 'role:librarian']);
+
+    // ✅ MEMBERS (FIX 404)
+    $routes->get('members', 'Librarian\Members::index', ['filter' => 'role:librarian']);
+    $routes->post('members/(:num)/delete', 'Librarian\Members::delete/$1', ['filter' => 'role:librarian']); // nonaktif
+
+    // ✅ TRANSACTIONS (FIX 404)
+    $routes->get('transactions', 'Librarian\Transactions::index', ['filter' => 'role:librarian']);
+    $routes->post('transactions/(:num)/return', 'Librarian\Transactions::markReturned/$1', ['filter' => 'role:librarian']);
 });
 
-// Member Routes (FILTER DIHAPUS AGAR TIDAK MENTAL)
-$routes->group('member', static function ($routes) {
+// --------------------------------------------------------------------
+// Member Routes (PROTECTED)
+// --------------------------------------------------------------------
+$routes->group('member', ['filter' => 'auth'], static function ($routes) {
 
-    // Dashboard & Katalog (Tery)
-    $routes->get('dashboard', 'Member\Dashboard::index');
-    $routes->get('books', 'Member\BookController::index');
-    $routes->get('books/detail/(:num)', 'Member\BookController::detail/$1');
+    $routes->get('dashboard', 'Member\Dashboard::index', ['filter' => 'role:member']);
 
-    // Jobdesk 2 (Akses Langsung)
-    $routes->get('borrowed', 'Member\BorrowController::borrowed');
-    $routes->get('history', 'Member\BorrowController::history');
-    $routes->get('return', 'Member\ReturnController::index');
+    $routes->get('books', 'Member\BookController::index', ['filter' => 'role:member']);
+    $routes->get('books/detail/(:num)', 'Member\BookController::detail/$1', ['filter' => 'role:member']);
 
-    $routes->post('borrow/save', 'Member\BorrowController::save');
-    $routes->post('return-process/(:num)', 'Member\BorrowController::processReturn/$1');
+    $routes->get('borrowed', 'Member\BorrowController::borrowed', ['filter' => 'role:member']);
+    $routes->get('history', 'Member\BorrowController::history', ['filter' => 'role:member']);
+    $routes->get('return', 'Member\ReturnController::index', ['filter' => 'role:member']);
 
-    // Pinjam Buku
-    $routes->post('books/borrow/(:num)', 'Member\BookController::borrow/$1');
+    $routes->post('borrow/save', 'Member\BorrowController::save', ['filter' => 'role:member']);
+    $routes->post('return-process/(:num)', 'Member\BorrowController::processReturn/$1', ['filter' => 'role:member']);
 
-    // Alias Sidebar
-    $routes->get('transactions', 'Member\BorrowController::history');
+    $routes->post('books/borrow/(:num)', 'Member\BookController::borrow/$1', ['filter' => 'role:member']);
+
+    $routes->get('transactions', 'Member\BorrowController::history', ['filter' => 'role:member']);
 });

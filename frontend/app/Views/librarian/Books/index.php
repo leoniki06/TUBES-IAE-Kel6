@@ -1,6 +1,8 @@
 <?= $this->extend('layouts/app') ?>
 <?= $this->section('content') ?>
 
+<link rel="stylesheet" href="<?= base_url('assets/css/librarian-books.css') ?>">
+
 <?php
 $errors = session()->getFlashdata('errors') ?? [];
 
@@ -52,7 +54,7 @@ $genres = [
         </button>
     </div>
 
-    <!-- Toasts (fixed top-right via CSS patch) -->
+    <!-- Toasts -->
     <div class="bx-toasts" aria-live="polite" aria-atomic="true">
         <?php if ($flashSuccess): ?>
             <div class="bx-toast success js-toast" role="status" data-autohide="3500">
@@ -138,6 +140,9 @@ $genres = [
                             $total     = (int)($b['stock_total'] ?? 0);
                             $avail     = (int)($b['stock_available'] ?? 0);
 
+                            // ✅ cover dari Laravel (Book model appends cover_url)
+                            $coverUrl  = (string)($b['cover_url'] ?? '');
+
                             // low stock: <=20% atau avail=0
                             $isLow = $avail <= 0 || ($total > 0 && ($avail / max(1, $total)) <= 0.2);
 
@@ -152,7 +157,12 @@ $genres = [
 
                                 <td>
                                     <div class="bx-bookcell">
-                                        <div class="bx-avatar"><?= esc($firstChar) ?></div>
+                                        <?php if ($coverUrl !== ''): ?>
+                                            <img class="bx-coverthumb" src="<?= esc($coverUrl) ?>" alt="Cover">
+                                        <?php else: ?>
+                                            <div class="bx-avatar"><?= esc($firstChar) ?></div>
+                                        <?php endif; ?>
+
                                         <div style="min-width:0;">
                                             <div class="bx-booktitle"><?= esc($title) ?></div>
                                             <div class="bx-booksub"><span class="bx-strong">ISBN:</span> <?= esc($isbn ?: '-') ?></div>
@@ -185,6 +195,7 @@ $genres = [
                                             data-year="<?= esc($year) ?>"
                                             data-stock_total="<?= esc($total) ?>"
                                             data-stock_available="<?= esc($avail) ?>"
+                                            data-cover_url="<?= esc($coverUrl) ?>"
                                             title="Edit">
                                             <span class="dots">⋯</span>
                                         </button>
@@ -243,7 +254,8 @@ $genres = [
             <button class="m-close" type="button" data-close>✕</button>
         </div>
 
-        <form method="post" id="addForm" action="<?= base_url('librarian/books') ?>">
+        <!-- ✅ enctype wajib untuk upload cover -->
+        <form method="post" id="addForm" action="<?= base_url('librarian/books') ?>" enctype="multipart/form-data">
             <?= csrf_field() ?>
 
             <div class="m-body">
@@ -303,6 +315,13 @@ $genres = [
                         <label>Stock Available</label>
                         <input type="number" min="0" name="stock_available" value="<?= esc(old('stock_available') ?? '0') ?>">
                     </div>
+
+                    <!-- ✅ Cover -->
+                    <div class="frow" style="grid-column:1/-1;">
+                        <label>Cover (optional)</label>
+                        <input type="file" name="cover" id="a_cover" accept=".jpg,.jpeg,.png,.webp">
+                        <div class="fhelp">Max 2MB • JPG/JPEG/PNG/WEBP</div>
+                    </div>
                 </div>
             </div>
 
@@ -322,7 +341,8 @@ $genres = [
             <button class="m-close" type="button" data-close>✕</button>
         </div>
 
-        <form method="post" id="editForm" action="#">
+        <!-- ✅ enctype wajib untuk upload cover -->
+        <form method="post" id="editForm" action="#" enctype="multipart/form-data">
             <?= csrf_field() ?>
 
             <div class="m-body">
@@ -372,6 +392,25 @@ $genres = [
                         <label>Stock Available</label>
                         <input type="number" min="0" name="stock_available" id="e_stock_available">
                     </div>
+
+                    <!-- ✅ Cover edit -->
+                    <div class="frow" style="grid-column:1/-1;">
+                        <label>Cover (optional)</label>
+
+                        <div class="bx-coverrow">
+                            <img id="e_cover_preview" class="bx-coverpreview" src="" alt="Cover preview" style="display:none;">
+                            <div class="bx-covermeta" id="e_cover_meta">Tidak ada cover</div>
+                        </div>
+
+                        <input type="file" name="cover" id="e_cover" accept=".jpg,.jpeg,.png,.webp">
+
+                        <label class="bx-check">
+                            <input type="checkbox" name="remove_cover" value="1" id="e_remove_cover">
+                            Hapus cover
+                        </label>
+
+                        <div class="fhelp">Upload file baru untuk mengganti cover.</div>
+                    </div>
                 </div>
             </div>
 
@@ -386,7 +425,7 @@ $genres = [
 <script>
     window.BOOKS_PAGE = {
         baseBooksUrl: "<?= base_url('librarian/books') ?>",
-        openAddOnError: <?= (!empty($errors) && old('title') !== null) ? 'true' : 'false' ?>
+        openAddOnError: <?= session()->getFlashdata('open_add_modal') ? 'true' : 'false' ?>
     };
 </script>
 

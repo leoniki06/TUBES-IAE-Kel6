@@ -29,19 +29,72 @@ class Auth extends BaseController
     }
 
     /**
+     * Helper: cek sesi login valid
+     */
+    private function isSessionValid(): bool
+    {
+        $isLoggedIn = (bool) session('isLoggedIn');
+        $user       = session('user');
+        $token      = (string) session('token');
+
+        if (!$isLoggedIn) return false;
+        if (!is_array($user) || empty($user['id'])) return false;
+
+        // recommended: kalau app kamu bergantung ke JWT, token wajib ada
+        if ($token === '') return false;
+
+        return true;
+    }
+
+    /**
+     * Helper: normalize role dari API (string/array)
+     */
+    private function normalizeRole($role): string
+    {
+        if (is_array($role)) {
+            $role = $role['name'] ?? '';
+        }
+        $role = strtolower(trim((string) $role));
+        return $role !== '' ? $role : 'member';
+    }
+
+    /**
+     * Helper: simpan sesi login konsisten
+     */
+    private function setLoginSession(array $user, string $token): void
+    {
+        $role = $this->normalizeRole($user['role'] ?? 'member');
+        $user['role'] = $role;
+
+        $userId = $user['id'] ?? null;
+
+        session()->set([
+            'token'      => $token,
+            'user'       => $user,
+            'user_id'    => $userId,   // ✅ penting untuk transaksi
+            'role'       => $role,     // ✅ memudahkan RoleFilter
+            'isLoggedIn' => true,
+        ]);
+
+        // ✅ cegah session fixation & state nempel pas testing
+        session()->regenerate();
+
+        // Optional: supaya layout bisa sync token ke localStorage
+        if ($token !== '') {
+            session()->setFlashdata('token_baru', $token);
+        }
+    }
+
+    /**
      * =========================
      * ✅ GET LOGIN PAGE
      * Route: GET auth/login
      * =========================
-     * Karena sistem kamu sebenarnya login lewat modal di splash,
-     * route ini kita arahkan ke splash dan buka modal login.
      */
     public function login()
     {
-        // kalau sudah login, arahkan sesuai role
-        $user = session('user');
-        if (is_array($user) && !empty($user['role'])) {
-            $role = strtolower((string) $user['role']);
+        if ($this->isSessionValid()) {
+            $role = strtolower((string) session('role'));
             return $role === 'librarian'
                 ? redirect()->to('/librarian/dashboard')
                 : redirect()->to('/member/dashboard');
@@ -58,10 +111,8 @@ class Auth extends BaseController
      */
     public function register()
     {
-        // kalau sudah login, arahkan sesuai role
-        $user = session('user');
-        if (is_array($user) && !empty($user['role'])) {
-            $role = strtolower((string) $user['role']);
+        if ($this->isSessionValid()) {
+            $role = strtolower((string) session('role'));
             return $role === 'librarian'
                 ? redirect()->to('/librarian/dashboard')
                 : redirect()->to('/member/dashboard');
@@ -78,7 +129,7 @@ class Auth extends BaseController
      */
     public function doLogin()
     {
-        $email = trim((string) $this->request->getPost('email'));
+        $email    = trim((string) $this->request->getPost('email'));
         $password = (string) $this->request->getPost('password');
 
         if ($email === '' || $password === '') {
@@ -93,39 +144,37 @@ class Auth extends BaseController
 
         $payload = $res['data'] ?? [];
 
-        if (!($res['ok'] ?? false) || !($payload['success'] ?? false)) {
+        // ✅ jika request gagal / response bukan json, tampilkan raw biar gampang debug
+        if (!($res['ok'] ?? false) || !is_array($payload) || !($payload['success'] ?? false)) {
+            $msg = $payload['message'] ?? 'Login gagal.';
+            if (!empty($res['error'])) $msg .= ' ' . $res['error'];
+            if (($res['status'] ?? 0) === 0 && !empty($res['raw'])) $msg .= ' (Raw: ' . substr($res['raw'], 0, 120) . '...)';
+
+            // bersihin sesi biar gak ada login palsu
+            session()->remove(['token', 'user', 'user_id', 'role', 'isLoggedIn']);
+
             return redirect()->to('/')
-                ->with('error', $payload['message'] ?? 'Login Gagal')
+                ->with('error', $msg)
                 ->with('openModal', 'login');
         }
 
-        $user = $payload['data']['user'] ?? [];
-
-        // role dari API bisa bentuk:
-        // - $user['role']['name']
-        // - atau $user['role'] string
-        $role = $user['role'] ?? 'member';
-        if (is_array($role)) {
-            $role = $role['name'] ?? 'member';
-        }
-        $user['role'] = strtolower((string) $role);
-
+        $user  = $payload['data']['user'] ?? [];
         $token = (string) ($payload['data']['token'] ?? '');
 
-        // Simpan data login
-        session()->set([
-            'token'      => $token,
-            'user'       => $user,
-            'isLoggedIn' => true
-        ]);
+        // ✅ ini wajib: kalau token kosong, jangan anggap login sukses
+        if (!is_array($user) || empty($user['id']) || $token === '') {
+            session()->remove(['token', 'user', 'user_id', 'role', 'isLoggedIn']);
 
-        // Optional: supaya layout bisa sync token ke localStorage
-        if ($token !== '') {
-            session()->setFlashdata('token_baru', $token);
+            return redirect()->to('/')
+                ->with('error', 'Login gagal: data user/token tidak valid dari API.')
+                ->with('openModal', 'login');
         }
 
-        // Redirect sesuai role
-        if ($user['role'] === 'librarian') {
+        $this->setLoginSession($user, $token);
+
+        $role = (string) session('role');
+
+        if ($role === 'librarian') {
             return redirect()->to('/librarian/dashboard')
                 ->with('success', 'Login berhasil.');
         }
@@ -152,7 +201,6 @@ class Auth extends BaseController
                 ->with('openModal', 'register');
         }
 
-        // CALL API REGISTER (LARAVEL)
         $res = $this->api->post('/api/auth/register', [
             'json' => [
                 'name'     => $name,
@@ -163,35 +211,34 @@ class Auth extends BaseController
 
         $payload = $res['data'] ?? [];
 
-        if (!($res['ok'] ?? false) || !($payload['success'] ?? false)) {
+        if (!($res['ok'] ?? false) || !is_array($payload) || !($payload['success'] ?? false)) {
+            $msg = $payload['message'] ?? 'Registrasi gagal.';
+            if (!empty($res['error'])) $msg .= ' ' . $res['error'];
+
+            // bersihin sesi
+            session()->remove(['token', 'user', 'user_id', 'role', 'isLoggedIn']);
+
             return redirect()->to('/')
-                ->with('error', $payload['message'] ?? 'Registrasi gagal.')
+                ->with('error', $msg)
                 ->with('openModal', 'register');
         }
 
-        $user = $payload['data']['user'] ?? [];
-
-        $role = $user['role'] ?? 'member';
-        if (is_array($role)) {
-            $role = $role['name'] ?? 'member';
-        }
-        $user['role'] = strtolower((string) $role);
-
+        $user  = $payload['data']['user'] ?? [];
         $token = (string) ($payload['data']['token'] ?? '');
 
-        session()->set([
-            'token'      => $token,
-            'user'       => $user,
-            'isLoggedIn' => true,
-        ]);
+        if (!is_array($user) || empty($user['id']) || $token === '') {
+            session()->remove(['token', 'user', 'user_id', 'role', 'isLoggedIn']);
 
-        session()->regenerate();
-
-        if ($token !== '') {
-            session()->setFlashdata('token_baru', $token);
+            return redirect()->to('/')
+                ->with('error', 'Registrasi gagal: data user/token tidak valid dari API.')
+                ->with('openModal', 'register');
         }
 
-        if ($user['role'] === 'librarian') {
+        $this->setLoginSession($user, $token);
+
+        $role = (string) session('role');
+
+        if ($role === 'librarian') {
             return redirect()->to('/librarian/dashboard')
                 ->with('success', 'Registrasi berhasil. Selamat datang!');
         }

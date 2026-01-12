@@ -62,12 +62,6 @@ class Books extends BaseController
         ]);
     }
 
-    /**
-     * Resolve cover dari folder public/assets/img/books/
-     * 1) pakai cover dari API kalau ada
-     * 2) kalau kosong → buat slug dari title → cari file slug.jpg / slug.png / dst
-     * 3) kalau tidak ada → null (nanti view pakai ui-avatar)
-     */
     private function resolveLocalCover(array $book): ?string
     {
         // kalau API sudah kasih cover, boleh dipakai langsung (nama file atau url)

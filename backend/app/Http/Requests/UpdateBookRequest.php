@@ -18,10 +18,15 @@ class UpdateBookRequest extends FormRequest
             'title'           => ['required', 'string', 'max:200'],
             'author'          => ['required', 'string', 'max:150'],
             'publisher'       => ['nullable', 'string', 'max:150'],
-            'genre'           => ['required', 'string', 'max:80'], // ✅ WAJIB ADA
+            'genre'           => ['required', 'string', 'max:80'],
             'year'            => ['nullable', 'integer', 'min:0', 'max:3000'],
             'stock_total'     => ['required', 'integer', 'min:0'],
             'stock_available' => ['nullable', 'integer', 'min:0'],
+
+            // ✅ cover optional
+            'cover'           => ['nullable','file','mimes:jpg,jpeg,png,webp','max:2048'],
+            // ✅ optional hapus cover tanpa upload baru
+            'remove_cover'    => ['nullable','boolean'],
         ];
     }
 
@@ -36,6 +41,8 @@ class UpdateBookRequest extends FormRequest
             'year'            => $this->input('year') !== null && $this->input('year') !== '' ? (int) $this->input('year') : null,
             'stock_total'     => $this->input('stock_total') !== null ? (int) $this->input('stock_total') : null,
             'stock_available' => $this->input('stock_available') !== null && $this->input('stock_available') !== '' ? (int) $this->input('stock_available') : null,
+
+            'remove_cover'    => $this->input('remove_cover') !== null ? (bool) $this->input('remove_cover') : null,
         ]);
     }
 }

@@ -7,6 +7,7 @@ use App\Http\Requests\RegisterRequest;
 use App\Http\Requests\LoginRequest;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 class AuthController extends Controller
 {
@@ -18,8 +19,8 @@ class AuthController extends Controller
             'name'      => (string) $payload['name'],
             'email'     => (string) $payload['email'],
             'password'  => Hash::make((string) $payload['password']),
-            'role'      => 'member',     
-            'is_active' => true,
+            'role'      => 'member',
+            'is_active' => 1,
         ]);
 
         $token = auth('api')->login($user);
@@ -39,25 +40,20 @@ class AuthController extends Controller
     {
         $credentials = $request->only(['email', 'password']);
 
+        // kalau kolom is_active ada, paksa hanya user aktif yang boleh attempt
+        if (Schema::hasColumn('users', 'is_active')) {
+            $credentials['is_active'] = 1;
+        }
+
         if (!$token = auth('api')->attempt($credentials)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid credentials',
+                'message' => 'Invalid credentials / inactive account',
                 'errors'  => (object)[],
             ], 401);
         }
 
         $user = auth('api')->user();
-
-        // optional: blokir kalau nonaktif
-        if (isset($user->is_active) && !$user->is_active) {
-            auth('api')->logout();
-            return response()->json([
-                'success' => false,
-                'message' => 'Account is deactivated',
-                'errors'  => (object)[],
-            ], 403);
-        }
 
         return response()->json([
             'success' => true,
@@ -65,10 +61,11 @@ class AuthController extends Controller
             'data' => [
                 'token' => $token,
                 'token_type' => 'Bearer',
-                'user' => $user, // ✅ CI4 bisa ambil role dari sini (tanpa /me pun bisa)
+                'user' => $user,
             ],
         ], 200);
     }
+
 
     public function me()
     {
