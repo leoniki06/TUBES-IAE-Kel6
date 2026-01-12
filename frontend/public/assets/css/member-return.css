@@ -1,0 +1,86 @@
+/* Small polish untuk halaman return */
+.hint-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  /* Loading row */
+  .td-loading {
+    padding: 22px 20px !important;
+  }
+
+  .loading-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .loader {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(148, 163, 184, 0.5);
+    border-top-color: rgba(61, 178, 255, 1);
+    animation: spin 0.9s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Error row */
+  .error-row {
+    background: #fff;
+    padding: 16px;
+    border-radius: var(--radius-s);
+    border: 1px solid #e2e8f0;
+    color: var(--text);
+  }
+
+  /* Empty state */
+  .empty-state {
+    margin-top: 18px;
+  }
+
+  .empty-card {
+    background: #fff;
+    border-radius: var(--radius-m);
+    box-shadow: var(--shadow);
+    padding: 28px;
+    text-align: center;
+    border: 1px solid #f1f5f9;
+  }
+
+  .empty-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    margin: 0 auto 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary-soft);
+    color: var(--primary);
+  }
+
+  .empty-card h4 {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--dark);
+    margin-bottom: 6px;
+  }
+
+  .empty-card p {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+
+  /* tombol return biar konsisten */
+  .btn-return {
+    border: none;
+    cursor: pointer;
+  }

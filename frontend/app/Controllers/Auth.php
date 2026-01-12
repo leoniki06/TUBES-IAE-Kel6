@@ -14,6 +14,10 @@ class Auth extends BaseController
         $this->api = new ApiClient();
     }
 
+    /**
+     * Halaman splash (landing)
+     * Menampilkan modal login/register
+     */
     public function splash()
     {
         return view('auth/splash', [
@@ -26,12 +30,55 @@ class Auth extends BaseController
 
     /**
      * =========================
-     * 🔐 LOGIN
+     * ✅ GET LOGIN PAGE
+     * Route: GET auth/login
+     * =========================
+     * Karena sistem kamu sebenarnya login lewat modal di splash,
+     * route ini kita arahkan ke splash dan buka modal login.
+     */
+    public function login()
+    {
+        // kalau sudah login, arahkan sesuai role
+        $user = session('user');
+        if (is_array($user) && !empty($user['role'])) {
+            $role = strtolower((string) $user['role']);
+            return $role === 'librarian'
+                ? redirect()->to('/librarian/dashboard')
+                : redirect()->to('/member/dashboard');
+        }
+
+        return redirect()->to('/')->with('openModal', 'login');
+    }
+
+    /**
+     * =========================
+     * ✅ GET REGISTER PAGE
+     * Route: GET auth/register
+     * =========================
+     */
+    public function register()
+    {
+        // kalau sudah login, arahkan sesuai role
+        $user = session('user');
+        if (is_array($user) && !empty($user['role'])) {
+            $role = strtolower((string) $user['role']);
+            return $role === 'librarian'
+                ? redirect()->to('/librarian/dashboard')
+                : redirect()->to('/member/dashboard');
+        }
+
+        return redirect()->to('/')->with('openModal', 'register');
+    }
+
+    /**
+     * =========================
+     * 🔐 LOGIN (POST)
+     * Route: POST auth/login
      * =========================
      */
     public function doLogin()
     {
-        $email    = trim((string) $this->request->getPost('email'));
+        $email = trim((string) $this->request->getPost('email'));
         $password = (string) $this->request->getPost('password');
 
         if ($email === '' || $password === '') {
@@ -39,8 +86,6 @@ class Auth extends BaseController
                 ->with('error', 'Email dan password wajib diisi.')
                 ->with('openModal', 'login');
         }
-
-        session()->remove(['token', 'user']);
 
         $res = $this->api->post('/api/auth/login', [
             'json' => compact('email', 'password'),
@@ -50,33 +95,51 @@ class Auth extends BaseController
 
         if (!($res['ok'] ?? false) || !($payload['success'] ?? false)) {
             return redirect()->to('/')
-                ->with('error', $payload['message'] ?? 'Login gagal.')
+                ->with('error', $payload['message'] ?? 'Login Gagal')
                 ->with('openModal', 'login');
         }
 
         $user = $payload['data']['user'] ?? [];
 
-        /**
-         * 🔥 NORMALISASI ROLE
-         */
-        $role = $user['role'] ?? null;
-
+        // role dari API bisa bentuk:
+        // - $user['role']['name']
+        // - atau $user['role'] string
+        $role = $user['role'] ?? 'member';
         if (is_array($role)) {
-            $role = $role['name'] ?? '';
+            $role = $role['name'] ?? 'member';
         }
-
         $user['role'] = strtolower((string) $role);
 
-        session()->set('token', $payload['data']['token']);
-        session()->set('user', $user);
-        session()->regenerate();
+        $token = (string) ($payload['data']['token'] ?? '');
 
-        return $user['role'] === 'librarian'
-            ? redirect()->to('/librarian/dashboard')->with('success', 'Login berhasil.')
-            : redirect()->to('/member/dashboard')->with('success', 'Login berhasil.');
+        // Simpan data login
+        session()->set([
+            'token'      => $token,
+            'user'       => $user,
+            'isLoggedIn' => true
+        ]);
+
+        // Optional: supaya layout bisa sync token ke localStorage
+        if ($token !== '') {
+            session()->setFlashdata('token_baru', $token);
+        }
+
+        // Redirect sesuai role
+        if ($user['role'] === 'librarian') {
+            return redirect()->to('/librarian/dashboard')
+                ->with('success', 'Login berhasil.');
+        }
+
+        return redirect()->to('/member/dashboard')
+            ->with('success', 'Login berhasil.');
     }
 
-   
+    /**
+     * =========================
+     * 🧾 REGISTER (POST)
+     * Route: POST auth/register
+     * =========================
+     */
     public function doRegister()
     {
         $name     = trim((string) $this->request->getPost('name'));
@@ -89,9 +152,7 @@ class Auth extends BaseController
                 ->with('openModal', 'register');
         }
 
-        /**
-         * 🔹 CALL API REGISTER (LARAVEL)
-         */
+        // CALL API REGISTER (LARAVEL)
         $res = $this->api->post('/api/auth/register', [
             'json' => [
                 'name'     => $name,
@@ -108,21 +169,32 @@ class Auth extends BaseController
                 ->with('openModal', 'register');
         }
 
-        /**
-
-         */
         $user = $payload['data']['user'] ?? [];
-        $role = $user['role'] ?? 'member';
 
+        $role = $user['role'] ?? 'member';
         if (is_array($role)) {
             $role = $role['name'] ?? 'member';
         }
-
         $user['role'] = strtolower((string) $role);
 
-        session()->set('token', $payload['data']['token']);
-        session()->set('user', $user);
+        $token = (string) ($payload['data']['token'] ?? '');
+
+        session()->set([
+            'token'      => $token,
+            'user'       => $user,
+            'isLoggedIn' => true,
+        ]);
+
         session()->regenerate();
+
+        if ($token !== '') {
+            session()->setFlashdata('token_baru', $token);
+        }
+
+        if ($user['role'] === 'librarian') {
+            return redirect()->to('/librarian/dashboard')
+                ->with('success', 'Registrasi berhasil. Selamat datang!');
+        }
 
         return redirect()->to('/member/dashboard')
             ->with('success', 'Registrasi berhasil. Selamat datang!');
@@ -131,6 +203,7 @@ class Auth extends BaseController
     /**
      * =========================
      * 🚪 LOGOUT
+     * Route: GET logout / GET auth/logout
      * =========================
      */
     public function logout()
