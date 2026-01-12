@@ -11,9 +11,38 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="<?= base_url('assets/css/member-dashboard.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/member-dashboard.css') ?>?v=<?= time() ?>">
+
+    <style>
+        .t-cover, .reco-img {
+            object-fit: cover;
+        }
+        .reco-img{
+            background-size: cover !important;
+            background-position: center !important;
+            background-repeat: no-repeat !important;
+        }
+    </style>
 </head>
 <body>
+
+<?php
+// helper kecil: resolve cover (support cover_url / cover filename / url)
+function resolveCover($book): string {
+    $coverRaw = $book['cover_url'] ?? ($book['cover'] ?? '');
+    if (!empty($coverRaw)) {
+        if (preg_match('/^https?:\/\//', $coverRaw)) return $coverRaw;
+        if (strpos($coverRaw, 'assets/') === 0) return base_url($coverRaw);
+        return base_url('assets/img/books/' . ltrim($coverRaw, '/'));
+    }
+    return base_url('assets/img/books/laskar-pelangi.jpg'); // fallback local
+}
+
+function formatTanggal($dateStr): string {
+    if (!$dateStr) return '-';
+    return date('d M', strtotime($dateStr));
+}
+?>
 
 <div class="app-container">
 
@@ -53,7 +82,7 @@
                     <img src="https://ui-avatars.com/api/?name=<?= urlencode(session('user.name') ?? 'Member') ?>&background=3DB2FF&color=fff" alt="User">
                 </div>
                 <div class="user-details">
-                    <span class="u-name"><?= session('user.name') ?? 'Tery' ?></span>
+                    <span class="u-name"><?= esc(session('user.name') ?? 'Member') ?></span>
                     <span class="u-role">Member Aktif</span>
                 </div>
             </div>
@@ -81,16 +110,18 @@
 
         <section class="dashboard-hero">
             <div class="hero-text">
-                <h1>Halo, <?= session('user.name') ?? 'Tery' ?>! 👋</h1>
+                <h1>Halo, <?= esc(session('user.name') ?? 'Member') ?>! 👋</h1>
                 <p>Selamat datang kembali di portal perpustakaan.</p>
             </div>
 
-            <div class="alert-wrapper">
-                <div class="alert-box warning">
-                    <i data-feather="alert-circle"></i>
-                    <span><strong>Perhatian:</strong> Buku "Clean Code" akan jatuh tempo 2 hari lagi.</span>
+            <?php if (!empty($summary['nearest_due'])): ?>
+                <div class="alert-wrapper">
+                    <div class="alert-box warning">
+                        <i data-feather="alert-circle"></i>
+                        <span><strong>Perhatian:</strong> Ada pinjaman yang jatuh tempo pada <?= esc(date('d M Y', strtotime($summary['nearest_due']))) ?>.</span>
+                    </div>
                 </div>
-            </div>
+            <?php endif; ?>
         </section>
 
         <section class="stats-grid">
@@ -98,32 +129,37 @@
                 <div class="stat-icon"><i data-feather="book-open"></i></div>
                 <div class="stat-info">
                     <span class="stat-label">Buku Dipinjam</span>
-                    <h3 class="stat-value">2 Buku</h3>
-                    <small class="stat-note">Sedang dibaca</small>
+                    <h3 class="stat-value"><?= (int)($summary['active_borrowed'] ?? 0) ?> Buku</h3>
+                    <small class="stat-note">Aktif</small>
                 </div>
             </a>
+
             <a href="<?= base_url('member/borrowed') ?>" class="stat-card orange">
                 <div class="stat-icon"><i data-feather="clock"></i></div>
                 <div class="stat-info">
                     <span class="stat-label">Jatuh Tempo</span>
-                    <h3 class="stat-value">20 Jan</h3>
+                    <h3 class="stat-value">
+                        <?= !empty($summary['nearest_due']) ? esc(date('d M', strtotime($summary['nearest_due']))) : '-' ?>
+                    </h3>
                     <small class="stat-note">Terdekat</small>
                 </div>
             </a>
-            <a href="<?= base_url('member/transactions') ?>" class="stat-card pink">
+
+            <a href="<?= base_url('member/history') ?>" class="stat-card pink">
                 <div class="stat-icon"><i data-feather="alert-triangle"></i></div>
                 <div class="stat-info">
                     <span class="stat-label">Denda Aktif</span>
-                    <h3 class="stat-value">Rp 0</h3>
-                    <small class="stat-note">Aman terkendali</small>
+                    <h3 class="stat-value">Rp <?= number_format((int)($summary['total_fine'] ?? 0), 0, ',', '.') ?></h3>
+                    <small class="stat-note">Total</small>
                 </div>
             </a>
+
             <a href="<?= base_url('member/history') ?>" class="stat-card purple">
                 <div class="stat-icon"><i data-feather="archive"></i></div>
                 <div class="stat-info">
                     <span class="stat-label">Total Transaksi</span>
-                    <h3 class="stat-value">14</h3>
-                    <small class="stat-note">Buku telah dibaca</small>
+                    <h3 class="stat-value"><?= (int)($summary['total_transactions'] ?? 0) ?></h3>
+                    <small class="stat-note">Riwayat</small>
                 </div>
             </a>
         </section>
@@ -141,47 +177,50 @@
                         <thead>
                             <tr>
                                 <th>Buku</th>
-                                <th>Tgl Pinjam</th>
+                                <th>Tanggal Pinjam</th>
                                 <th>Jatuh Tempo</th>
                                 <th>Status</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
+
                         <tbody>
-                            <tr>
-                                <td>
-                                    <div class="book-flex">
-                                        <img src="https://m.media-amazon.com/images/I/41xShlnTZTL._SX376_BO1,204,203,200_.jpg" class="t-cover">
-                                        <div>
-                                            <div class="t-title">Clean Code</div>
-                                            <div class="t-sub">Robert C. Martin</div>
+                        <?php if (!empty($borrowed)): ?>
+                            <?php foreach ($borrowed as $t): ?>
+                                <?php
+                                    $isLate = (!empty($t['due_date']) && strtotime(date('Y-m-d')) > strtotime($t['due_date']));
+                                ?>
+                                <tr>
+                                    <td>
+                                        <div class="book-flex">
+                                            <img src="<?= esc(resolveCover($t)) ?>" class="t-cover" alt="cover">
+                                            <div>
+                                                <div class="t-title"><?= esc($t['title'] ?? '-') ?></div>
+                                                <div class="t-sub"><?= esc($t['author'] ?? '-') ?></div>
+                                            </div>
                                         </div>
-                                    </div>
-                                </td>
-                                <td>13 Jan</td>
-                                <td>20 Jan</td>
-                                <td><span class="badge active">🟢 Aktif</span></td>
-                                <td>
-                                    <a href="<?= base_url('member/return/1') ?>" class="btn-sm btn-primary">Kembalikan</a>
+                                    </td>
+                                    <td><?= esc(formatTanggal($t['borrow_date'] ?? null)) ?></td>
+                                    <td><?= esc(formatTanggal($t['due_date'] ?? null)) ?></td>
+                                    <td>
+                                        <?php if ($isLate): ?>
+                                            <span class="badge late">🔴 Terlambat</span>
+                                        <?php else: ?>
+                                            <span class="badge active">🟢 Aktif</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <a href="<?= base_url('member/return') ?>" class="btn-sm btn-primary">Kembalikan</a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="5" style="text-align:center; padding:20px; color:#64748B;">
+                                    Belum ada buku yang sedang dipinjam.
                                 </td>
                             </tr>
-                            <tr>
-                                <td>
-                                    <div class="book-flex">
-                                        <img src="https://m.media-amazon.com/images/I/51k+3k0k0iL._SX377_BO1,204,203,200_.jpg" class="t-cover">
-                                        <div>
-                                            <div class="t-title">Refactoring</div>
-                                            <div class="t-sub">Martin Fowler</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>01 Jan</td>
-                                <td>08 Jan</td>
-                                <td><span class="badge late">🔴 Terlambat</span></td>
-                                <td>
-                                    <a href="<?= base_url('member/pay-fine/2') ?>" class="btn-sm btn-outline-danger">Bayar Denda</a>
-                                </td>
-                            </tr>
+                        <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
@@ -191,74 +230,78 @@
                 <div class="section-head">
                     <h3>Aktivitas Terakhir</h3>
                 </div>
+
                 <div class="history-list">
-                    <div class="h-item">
-                        <div class="h-icon return"><i data-feather="check"></i></div>
-                        <div class="h-info">
-                            <div class="h-title">Atomic Habits</div>
-                            <div class="h-date">Dikembalikan • Kemarin</div>
+                    <?php if (!empty($recent)): ?>
+                        <?php foreach ($recent as $r): ?>
+                            <?php
+                                $isReturn = !empty($r['return_date']) || (($r['status'] ?? '') === 'returned');
+                                $icon = $isReturn ? 'check' : 'arrow-up-right';
+                                $cls  = $isReturn ? 'return' : 'borrow';
+                            ?>
+                            <div class="h-item">
+                                <div class="h-icon <?= esc($cls) ?>"><i data-feather="<?= esc($icon) ?>"></i></div>
+                                <div class="h-info">
+                                    <div class="h-title"><?= esc($r['title'] ?? '-') ?></div>
+                                    <div class="h-date">
+                                        <?= $isReturn ? 'Dikembalikan' : 'Dipinjam' ?>
+                                        • <?= esc(date('d M Y', strtotime($r['updated_at'] ?? $r['created_at'] ?? date('Y-m-d')))) ?>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div style="padding:12px; color:#64748B;">
+                            Belum ada aktivitas.
                         </div>
-                    </div>
-                    <div class="h-item">
-                        <div class="h-icon borrow"><i data-feather="arrow-up-right"></i></div>
-                        <div class="h-info">
-                            <div class="h-title">Design Patterns</div>
-                            <div class="h-date">Dipinjam • 12 Jan 2026</div>
-                        </div>
-                    </div>
+                    <?php endif; ?>
+
                     <a href="<?= base_url('member/history') ?>" class="btn-block-outline">Lihat Semua Riwayat</a>
                 </div>
             </div>
         </div>
 
         <section class="content-section">
-            <div class="section-head">
-                <h3>Rekomendasi Pilihan</h3>
-                <a href="<?= base_url('member/books') ?>" class="link-view">Lihat Katalog</a>
-            </div>
+    <div class="section-head">
+        <h3>Rekomendasi Pilihan</h3>
+        <a href="<?= base_url('member/books') ?>" class="link-view">Lihat Katalog</a>
+    </div>
 
-            <div class="reco-grid">
-                <a href="<?= base_url('book/detail/1') ?>" class="reco-card">
-                    <div class="reco-img" style="background-image: url('https://m.media-amazon.com/images/I/81wgcld4wxL._AC_UF1000,1000_QL80_.jpg')"></div>
-                    <div class="reco-content">
-                        <h4>Atomic Habits</h4>
-                        <span>James Clear</span>
-                    </div>
-                </a>
-                <a href="<?= base_url('book/detail/2') ?>" class="reco-card">
-                    <div class="reco-img" style="background-image: url('https://m.media-amazon.com/images/I/51W1sBPO7tL._SX380_BO1,204,203,200_.jpg')"></div>
-                    <div class="reco-content">
-                        <h4>The Pragmatic Programmer</h4>
-                        <span>Andrew Hunt</span>
-                    </div>
-                </a>
-                <a href="<?= base_url('book/detail/3') ?>" class="reco-card">
-                    <div class="reco-img" style="background-image: url('https://m.media-amazon.com/images/I/51E2055ZGUL._AC_UF1000,1000_QL80_.jpg')"></div>
-                    <div class="reco-content">
-                        <h4>Design Patterns</h4>
-                        <span>Erich Gamma</span>
-                    </div>
-                </a>
-                <a href="<?= base_url('book/detail/4') ?>" class="reco-card">
-                    <div class="reco-img" style="background-image: url('https://m.media-amazon.com/images/I/713jIoMO3UL._AC_UF1000,1000_QL80_.jpg')"></div>
-                    <div class="reco-content">
-                        <h4>Sapiens</h4>
-                        <span>Yuval Noah Harari</span>
-                    </div>
-                </a>
-                 <a href="<?= base_url('book/detail/5') ?>" class="reco-card">
-                    <div class="reco-img" style="background-image: url('https://m.media-amazon.com/images/I/81q6-h7-yXL._AC_UF1000,1000_QL80_.jpg')"></div>
-                    <div class="reco-content">
-                        <h4>Company of One</h4>
-                        <span>Paul Jarvis</span>
-                    </div>
-                </a>
-            </div>
-        </section>
+    <div class="reco-grid">
+        <?php if (!empty($reco)): ?>
+            <?php foreach ($reco as $b): ?>
+                <?php
+                    $title  = $b['title'] ?? 'Buku';
+                    $author = $b['author'] ?? '-';
+                    $id     = $b['id'] ?? 0;
 
+                    // kalau kamu sudah pakai cover_url di katalog, bisa pakai yang sama.
+                    // untuk aman, fallback avatar:
+                    $cover = $b['cover'] ?? '';
+                    if (!$cover) {
+                        $cover = "https://ui-avatars.com/api/?name=" . urlencode($title) . "&background=3DB2FF&color=fff&size=512";
+                    } else if (!preg_match('#^https?://#i', $cover)) {
+                        $cover = base_url('assets/img/books/' . ltrim($cover, '/'));
+                    }
+                ?>
+
+                <a href="<?= base_url('member/books/detail/' . $id) ?>" class="reco-card">
+                    <div class="reco-img" style="background-image: url('<?= esc($cover) ?>')"></div>
+                    <div class="reco-content">
+                        <h4><?= esc($title) ?></h4>
+                        <span><?= esc($author) ?></span>
+                    </div>
+                </a>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <div style="padding: 10px 0; color:#64748B;">
+                Belum ada rekomendasi.
+            </div>
+        <?php endif; ?>
+    </div>
+</section>
     </main>
 </div>
-
-<script>feather.replace()</script>
+<script>feather.replace();</script>
 </body>
 </html>

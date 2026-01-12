@@ -10,20 +10,14 @@ class AuthFilter implements FilterInterface
 {
     public function before(RequestInterface $request, $arguments = null)
     {
-        $token = session('token');
-        $user  = session('user');
-
-        if (!$token || !is_array($user)) {
-            // simpan tujuan biar setelah login bisa balik
-            session()->setFlashdata('redirectTo', current_url(true)->getPath());
-
-            return redirect()->to('/')
-                ->with('error', 'Silakan login terlebih dahulu.')
-                ->with('openModal', 'login');
+        if (!session()->get('user')) {
+            return redirect()->to(base_url('auth/login'))
+                ->with('error', 'Silakan login terlebih dahulu.');
         }
-
         return null;
     }
 
-    public function after(RequestInterface $request, ResponseInterface $response, $arguments = null) {}
+    public function after(RequestInterface $request, ResponseInterface $response, $arguments = null)
+    {
+    }
 }

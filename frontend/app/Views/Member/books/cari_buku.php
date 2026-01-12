@@ -5,11 +5,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cari Buku - BookHouse</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
-        rel="stylesheet">
 
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= base_url('assets/css/member-books.css') ?>?v=<?= time() ?>">
     <script src="https://unpkg.com/feather-icons"></script>
+
+    <style>
+        .book-cover {
+            background-size: cover !important;
+            background-position: center !important;
+            background-repeat: no-repeat !important;
+        }
+    </style>
 </head>
 
 <body>
@@ -95,28 +102,49 @@
                         <?php foreach ($books as $b): ?>
 
                             <?php
-                            // Logic Cover (gunakan placeholder jika kosong)
-                            $cover = !empty($b['cover']) ? $b['cover'] : base_url('assets/img/no-book.png');
-                            // Jika URL eksternal tidak valid, bisa pakai placeholder online
-                            if (empty($b['cover'])) {
-                                $cover = 'https://via.placeholder.com/300x450?text=No+Cover';
+                            $title  = $b['title'] ?? 'Buku';
+                            $author = $b['author'] ?? '-';
+
+                            // ===== COVER RESOLVER (LOKAL + URL) =====
+                            $coverRaw = $b['cover'] ?? ($b['cover_url'] ?? '');
+                            $fallbackLocal = base_url('assets/img/books/laskar-pelangi.jpg');
+                            $fallbackAvatar = "https://ui-avatars.com/api/?name=" . urlencode($title) . "&background=3DB2FF&color=fff&size=512";
+
+                            if (!empty($coverRaw)) {
+                                // URL eksternal
+                                if (preg_match('/^https?:\/\//', $coverRaw)) {
+                                    $cover = $coverRaw;
+                                }
+                                // Sudah path assets/...
+                                else if (strpos($coverRaw, 'assets/') === 0) {
+                                    $cover = base_url($coverRaw);
+                                }
+                                // Cuma nama file -> arahkan ke folder public/assets/img/books/
+                                else {
+                                    $cover = base_url('assets/img/books/' . ltrim($coverRaw, '/'));
+                                }
+                            } else {
+                                $cover = $fallbackLocal;
                             }
                             ?>
 
                             <div class="book-card">
-                                <div class="book-cover" style="background-image:url('<?= esc($cover) ?>')"></div>
+                                <div class="book-cover js-book-cover"
+                                    style="background-image:url('<?= esc($cover) ?>')"
+                                    data-fallback="<?= esc($fallbackLocal) ?>"
+                                    data-avatar="<?= esc($fallbackAvatar) ?>">
+                                </div>
 
                                 <div class="book-info">
-                                    <h4><?= esc($b['title']) ?></h4>
-                                    <span><?= esc($b['author']) ?></span>
+                                    <h4><?= esc($title) ?></h4>
+                                    <span><?= esc($author) ?></span>
 
                                     <div class="book-meta">
                                         <small><?= esc($b['genre'] ?? 'Umum') ?></small>
                                     </div>
 
-                                    <a href="<?= base_url('member/books/detail/' . $b['id']) ?>" class="btn-detail">
+                                    <a href="<?= base_url('member/books/detail/' . ($b['id'] ?? 0)) ?>" class="btn-detail">
                                         Lihat Detail
-                                    </a>
                                     </a>
                                 </div>
                             </div>
@@ -136,6 +164,27 @@
 
     <script>
         feather.replace();
+
+        // cek load background-image, kalau error swap ke fallback lokal, lalu avatar
+        document.querySelectorAll('.js-book-cover').forEach(function(el) {
+            const bg = el.style.backgroundImage;
+            const url = bg.replace(/^url\(["']?/, '').replace(/["']?\)$/, '');
+            const fallback = el.getAttribute('data-fallback');
+            const avatar = el.getAttribute('data-avatar');
+
+            const img = new Image();
+            img.onerror = function() {
+                const img2 = new Image();
+                img2.onerror = function() {
+                    el.style.backgroundImage = `url('${avatar}')`;
+                };
+                img2.onload = function() {
+                    el.style.backgroundImage = `url('${fallback}')`;
+                };
+                img2.src = fallback;
+            };
+            img.src = url;
+        });
     </script>
 </body>
 

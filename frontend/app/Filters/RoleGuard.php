@@ -1,22 +1,21 @@
 <?php
-
 namespace App\Filters;
 
+use CodeIgniter\Filters\FilterInterface;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
-use CodeIgniter\Filters\FilterInterface;
 
 class RoleGuard implements FilterInterface
 {
     public function before(RequestInterface $request, $arguments = null)
     {
-        $role = session()->get('role');
+        $user = session()->get('user');
+        // Ambil role yang diminta dari Routes (misal: 'member')
+        $roleNeeded = $arguments[0] ?? '';
 
-        // contoh pakai: ['filter' => 'role:librarian']
-        $required = $arguments[0] ?? null;
-
-        if ($required && $role !== $required) {
-            return redirect()->to('/dashboard')->with('message', 'Akses ditolak (role tidak sesuai).');
+        // Jika user belum login atau role tidak sesuai, kembali ke splash
+        if (!$user || strtolower($user['role']) !== strtolower($roleNeeded)) {
+            return redirect()->to('/')->with('error', 'Akses ditolak.');
         }
     }
 

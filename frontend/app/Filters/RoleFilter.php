@@ -13,15 +13,16 @@ class RoleFilter implements FilterInterface
         $user = session('user');
 
         if (!is_array($user)) {
-            return redirect()->to('/')->with('openModal', 'login');
+            return redirect()->to(base_url('auth/login'))
+                ->with('error', 'Silakan login terlebih dahulu.')
+                ->with('openModal', 'login');
         }
 
         $role = strtolower((string) ($user['role'] ?? ''));
-
         $allowed = array_map('strtolower', (array) $arguments);
 
         if (!$role || !in_array($role, $allowed, true)) {
-            return redirect()->to('/')
+            return redirect()->to(base_url('auth/login'))
                 ->with('error', 'Akses ditolak.')
                 ->with('openModal', 'login');
         }
